@@ -10,5 +10,5 @@
     return old_resolveFilename.apply(this, arguments);
   }
 }());
-require("gorillascript");
-module.exports = require('./Gruntfile.gs');
+//require("gorillascript");
+module.exports = require('./_Gruntfile.js');

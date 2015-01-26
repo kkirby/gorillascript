@@ -3130,13 +3130,14 @@ let _FunctionDeclaration = do
     ExclamationPointChar
     AtSignChar
     AsterixChar
+    AsterixChar
     CaretChar)
 
   let FunctionFlags = zero-or-more(FunctionFlag) |> mutate #(codes, parser, index)
-    let flags = { +auto-return, -bound, -generator, -curry }
+    let flags = { +auto-return, -bound, -generator, -curry, -promise }
     let unique-chars = []
     for c in codes
-      if c in unique-chars
+      if c in unique-chars and c != C("*")
         throw ParserError "Function flag $(quote from-char-code c) specified more than once", parser, index
       else
         unique-chars.push c
@@ -3146,7 +3147,10 @@ let _FunctionDeclaration = do
         case C("@")
           flags.bound := true
         case C("*")
-          flags.generator := true
+          if flags.generator
+            flags.promise := true
+          else
+            flags.generator := true
         case C("^")
           flags.curry := true
         default
@@ -3196,6 +3200,13 @@ let _FunctionDeclaration = do
       as-type.value or LSymbol.nothing index
       LValue index, flags-value.generator
     let mutable result = mutate-function func, parser, index
+    if flags-value.promise
+      let promise-macro = parser.get-macro-by-label \__promise
+      if not promise-macro
+        throw ParserError "Cannot use promises until the promise! macro has been defined", parser, index
+      result := promise-macro.func {
+        macro-data: [result]
+      }, parser, index
     if flags-value.curry and params.value.length > 1
       // TODO: verify that there are no spread parameters
       result := LCall index, parser.scope.peek(),

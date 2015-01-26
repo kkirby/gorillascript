@@ -21,7 +21,7 @@ let pad-right(text, len, padding)
 
 class Cache<TKey, TValue>
   def constructor()
-    @weakmap := WeakMap()
+    @weakmap := new WeakMap()
   
   def get(key as TKey) -> @weakmap.get(key)
   

@@ -2,7 +2,7 @@ let {expect} = require 'chai'
 
 describe "WeakMap", #
   it "should handle mutable object keys", #
-    let wm = WeakMap()
+    let wm = new WeakMap()
     let obj = {}
     expect(wm.get obj).to.be.undefined
     expect(wm.has obj).to.be.false
@@ -18,7 +18,7 @@ describe "WeakMap", #
 
   let has-frozen = is-function! Object.freeze and is-function! Object.is-frozen and Object.is-frozen(Object.freeze({}))
   it "should handle frozen keys", #
-    let wm = WeakMap()
+    let wm = new WeakMap()
     let obj = Object.freeze {}
     expect(wm.get obj).to.be.undefined
     expect(wm.has obj).to.be.false
@@ -33,7 +33,7 @@ describe "WeakMap", #
     expect(wm.has obj).to.be.false
   
   it "should handle keys which are frozen after placed into WeakMap", #
-    let wm = WeakMap()
+    let wm = new WeakMap()
     let obj = Object.freeze {}
     expect(wm.get obj).to.be.undefined
     expect(wm.has obj).to.be.false

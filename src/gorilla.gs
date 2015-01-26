@@ -338,9 +338,9 @@ exports.compile-file-sync := #(options = {})
   exports.compile-file.sync {} <<< options <<< {+sync}
 
 let evaluate(code, options)
-  let Script = require?('vm')?.Script
-  if Script
-    let mutable sandbox = Script.create-context()
+  let vm = require?('vm')
+  if vm
+    let mutable sandbox = vm.create-context()
     sandbox.global := sandbox.root := sandbox.GLOBAL := sandbox
     if options.sandbox?
       if options.sandbox instanceof sandbox.constructor
@@ -367,7 +367,7 @@ let evaluate(code, options)
       for k of GLOBAL
         if sandbox not haskey k
           sandbox[k] := GLOBAL[k]
-    Script.run-in-context code, sandbox
+    vm.run-in-context code, sandbox
   else
     let fun = Function("return $code")
     fun()

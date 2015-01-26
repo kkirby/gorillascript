@@ -18,7 +18,7 @@ let error(err) -> process.stderr.write (err.stack or err.to-string()) & "\n\n"
 
 let mutable backlog = ''
 
-let sandbox = vm.Script.create-context()
+let sandbox = vm.create-context()
 let non-context-globals = [
   "Buffer"
   "console"
@@ -102,7 +102,7 @@ let complete-attribute(text)
   if match
     let [all, obj, prefix] = match
     let val = try
-      vm.Script.run-in-context to-js-ident(obj), sandbox
+      vm.run-in-context to-js-ident(obj), sandbox
     catch err
       return
     complete-segment prefix, get-all-property-names(val)
@@ -111,7 +111,7 @@ let complete-variable(text)
   let free = (text.match r'\s*([\w\-]*)$')?[1]
   if free
     let global-this = try
-      vm.Script.run-in-context 'this', sandbox
+      vm.run-in-context 'this', sandbox
     catch err
       void
     complete-segment free, [...get-all-property-names(global-this), ...get-all-property-names(sandbox), ...gorilla.get-reserved-words()]

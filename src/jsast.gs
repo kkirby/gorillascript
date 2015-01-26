@@ -63,6 +63,7 @@ const AstType = {
   TryCatch:       28
   TryFinally:     29
   Unary:          30
+  Yield:          39
 }
 
 let inc-indent(options)
@@ -1454,11 +1455,12 @@ let compile-func-body(options, sb, declarations, variables, body, mutable line-s
     if not minify
       sb options.linefeed or "\n"
 
-let compile-func(options, sb, name, params, declarations, variables, body)
+let compile-func(options, sb, name, params, declarations, variables, body, generator = false)
   sb "function"
   let minify = options.minify
   if not minify or name?
     sb " "
+  if generator; sb('*')
   if name?
     name.compile options, Level.inside-parentheses, false, sb
   sb "("
@@ -1481,7 +1483,7 @@ let compile-func(options, sb, name, params, declarations, variables, body)
   sb "}"
 
 exports.Func := class Func extends Expression
-  def constructor(@pos as {}, @name as null|Ident, @params as [Ident] = [], @variables as [String] = [], body as Node = Noop(pos), @declarations as [String] = [])
+  def constructor(@pos as {}, @name as null|Ident, @params as [Ident] = [], @variables as [String] = [], body as Node = Noop(pos), @declarations as [String] = [],@generator)
     validate-func-params-and-variables params, variables
     @body := body.remove-trailing-return-voids()
   
@@ -1492,7 +1494,7 @@ exports.Func := class Func extends Expression
     let wrap = line-start and not @name
     if wrap
       sb "("
-    compile-func options, sb, @name, @params, @declarations, @variables, @body
+    compile-func options, sb, @name, @params, @declarations, @variables, @body, @generator
     if wrap
       sb ")"
     if options.source-map? and @pos.file
@@ -1512,7 +1514,7 @@ exports.Func := class Func extends Expression
     let params = walk-array(@params, this, \param, walker)
     let body = walker(@body, this, \body) ? @body.walk(walker)
     if name != @name or params != @params or body != @body
-      Func @pos, name, params, @variables, body, @declarations, @meta
+      Func @pos, name, params, @variables, body, @declarations, @generator
     else
       this
   
@@ -1535,16 +1537,17 @@ exports.Func := class Func extends Expression
     @body.to-ast(pos, ident)
     ...for declaration in @declarations
       Const pos, declaration
+    Const pos, @generator
   ]
-  @_from-ast := #(pos, name, params, variables, body, ...declarations)
-    Func pos, name or null, params or [], variables or [], body, ...declarations
+  @_from-ast := #(pos, name, params, variables, body, ...declarations, generator)
+    Func pos, name or null, params or [], variables or [], body, declarations, generator
   def _to-JSON()
-    let result = [@name or 0, simplify-array(@params, 0), simplify-array(@variables, 0), simplify-array(@declarations, 0)]
+    let result = [@name or 0, simplify-array(@params, 0), simplify-array(@variables, 0), simplify-array(@declarations, 0), @generator]
     if simplify(@body)
       result.push ...@body.to-JSON()
     result
-  @from-JSON := #(line, column, file, name, params, variables, declarations, ...body)
-    Func make-pos(line, column, file), (if name then from-JSON(name)), array-from-JSON(params), variables, from-JSON(body), declarations
+  @from-JSON := #(line, column, file, name, params, variables, declarations, ...body, generator)
+    Func make-pos(line, column, file), (if name then from-JSON(name)), array-from-JSON(params), variables, from-JSON(body), declarations, generator
 
 exports.Ident := class Ident extends Expression
   def constructor(@pos as {}, @name as String, allow-unacceptable as Boolean)
@@ -2268,6 +2271,30 @@ exports.Throw := class Throw extends Statement
       []
   @from-JSON := #(line, column, file, ...node) -> Throw make-pos(line, column, file), from-JSON(node)
 
+exports.Yield := class Yield extends Expression
+  def constructor(@pos as {}, @node as Expression) ->
+
+  def compile(options, level, line-start, sb)!
+    sb "yield "
+    @node.compile options, Level.inside-parentheses, false, sb
+
+  def compile-as-block(options, level, line-start, sb)!
+    Noop(@pos).compile-as-block(options, level, line-start, sb)
+  
+  def walk(walker)
+      let node = walker(@node, this, \node) ? @node.walk(walker)
+      if node != @node
+        Yield @pos, node
+      else
+        this
+
+  def type-id = AstType.Yield
+  def _to-ast(pos, ident) -> [@node.to-ast(pos, ident)]
+  @_from-ast := #(pos, node) -> Yield pos, node
+  def _to-JSON() -> @node.to-JSON()
+  @from-JSON := #(line, column, file, source, ...node) -> Yield make-pos(line, column, file), from-JSON(node)
+
+
 exports.Switch := class Switch extends Statement
   def constructor(@pos as {}, mutable node = Noop(pos), @cases as [SwitchCase] = [], default-case as Node = Noop(pos), @label as Ident|null)
     if node not instanceof Expression
@@ -2767,6 +2794,7 @@ let AstType-to-class = {
   [AstType.TryCatch]: TryCatch
   [AstType.TryFinally]: TryFinally
   [AstType.Unary]: Unary
+  [AstType.Yield]: Yield
 }
 
 exports.by-type-id := #(type-id as Number, line as Number, column as Number, file, ...args)

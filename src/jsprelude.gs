@@ -1150,7 +1150,7 @@ macro do
           f i + 1
       f 0
       @call(
-        @func(params, @internal-call(\auto-return, body), true)
+        @func(params, @internal-call(\auto-return, @macro-expand-all(body)), true)
         values)
     else
       ASTE (#@ -> $body)()
@@ -1851,7 +1851,7 @@ macro for
       $current
 
 macro helper __generic-func = #(num-args as Number, make as ->)
-  let cache = WeakMap()
+  let cache = new WeakMap()
   let any = {}
   let generic = #
     for reduce i in num-args - 1 to 0 by -1, current = cache
@@ -1861,7 +1861,7 @@ macro helper __generic-func = #(num-args as Number, make as ->)
         item := if i == 0
           make@ this, ...arguments
         else
-          WeakMap()
+          new WeakMap()
         current.set type, item
       item
   let result = generic()
@@ -3726,7 +3726,7 @@ macro operator unary set! with type: \object, label: \construct-set
   node := @macro-expand-1 node
   if node.is-internal-call \array
     if node.args.length == 0
-      ASTE Set()
+      ASTE new Set()
     else
       let parts = []
       let tmp = @tmp \x
@@ -3737,13 +3737,13 @@ macro operator unary set! with type: \object, label: \construct-set
         else
           parts.push AST(el) $set.add $el
       AST
-        let $set = Set()
+        let $set = new Set()
         $parts
         $set
   else
     let item = @tmp \x
     AST
-      let $set as Set = Set()
+      let $set as Set = new Set()
       for $item in $node
         $set.add $item
       $set
@@ -3755,7 +3755,7 @@ macro operator unary map! with type: \object, label: \construct-map
   if node.is-internal-call \object
     let pairs = node.args
     if pairs.length == 0
-      ASTE Map()
+      ASTE new Map()
     else
       let parts = []
       for pair in pairs[1 to -1]
@@ -3763,14 +3763,14 @@ macro operator unary map! with type: \object, label: \construct-map
           @error "Cannot use map! on an object with custom properties", pair
         parts.push AST(pair) $map.set $(pair.args[0]), $(pair.args[1])
       AST
-        let $map as Map = Map()
+        let $map as Map = new Map()
         $parts
         $map
   else
     let key = @tmp \k
     let value = @tmp \v
     AST
-      let $map as Map = Map()
+      let $map as Map = new Map()
       for $key, $value of $node
         $map.set $key, $value
       $map
@@ -3868,54 +3868,37 @@ macro helper __defer = do
     d.promise
   __defer
 
-macro helper __generator-to-promise = #(generator as { send: (->), throw: (->) }, allow-sync as Boolean)
-  let continuer(verb, arg)
-    let mutable item = void
-    try
-      item := generator[verb](arg)
-    catch e
-      return __defer.rejected(e)
-    if item.done
-      __defer.fulfilled(item.value)
-    else
-      item.value.then callback, errback, allow-sync
-  let callback(value) -> continuer \send, value
-  let errback(value) -> continuer \throw, value
-  callback(void)
-
-macro helper __promise = #(mutable value, allow-sync as Boolean)
-  if is-function! value
-    let factory() -> __generator-to-promise value@(this, ...arguments)
-    factory.sync := #-> __generator-to-promise(value@(this, ...arguments), true).sync()
-    factory.maybe-sync := #-> __generator-to-promise(value@(this, ...arguments), true)
-    factory
-  else
-    __generator-to-promise value, allow-sync
+macro helper __generator-to-promise = #(func)
+  #()
+    let iter = func.apply(this,arguments)
+    new Promise #(fulfil,reject)
+      let next(result)
+        let info = iter.next(result)
+        if info.done; fulfil info.value
+        else if info.value instanceof Promise
+          info.value.then(
+            #(result) -> next(result)
+            reject
+          )
+      next()
 
 macro promise!
-  syntax sync as ("(", this as Expression, ")")?, node as Expression
+  syntax node as Expression
     node := @macro-expand-1 node
     if node.is-internal-call(\function) and node.args[4].is-const-falsy()
       @error "promise! must be used with a generator function", node
-    if sync and node.is-internal-call(\function)
-      @error "Use .sync() to retrieve asynchronously", sync
-    
-    if not sync or sync.is-const-falsy()
-      ASTE __promise($node)
-    else
-      ASTE __promise($node, $sync)
-  
-  syntax sync as ("(", this as Expression, ")")?, body as GeneratorBody
+    ASTE __generator-to-promise($node)()
+
+  syntax body as GeneratorBody
     let func = @func([]
       @internal-call \auto-return, body
       true
       null
       true)
-    
-    if not sync or sync.is-const-falsy()
-      ASTE __generator-to-promise($func())
-    else
-      ASTE __generator-to-promise($func(), $sync)
+    ASTE __generator-to-promise($func())
+
+macro __promise!(node) with label: \__promise
+	ASTE __generator-to-promise $node
 
 macro fulfilled!(node)
   if macro-data.length > 1
