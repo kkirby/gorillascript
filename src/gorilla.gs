@@ -32,26 +32,14 @@ let fetch-and-parse-prelude-macros = do
   let prelude-cache-path = if os? then path.join(os.tmp-dir(), "gs-jsprelude-$(exports.version).cache")
   let mutable prelude-promise = void
   let mutable work = promise! #(sync)*
-    let prelude-src-stat = if sync
-      fs.stat-sync prelude-src-path
-    else
-      yield to-promise! fs.stat prelude-src-path
-    
+    let prelude-src-stat = yield to-promise! fs.stat prelude-src-path
     let mutable prelude-cache-stat = void
     try
-      prelude-cache-stat := if sync
-        fs.stat-sync prelude-cache-path
-      else
-        yield to-promise! fs.stat prelude-cache-path
+      prelude-cache-stat := yield to-promise! fs.stat prelude-cache-path
     catch e
-      if e.code != "ENOENT"
-        throw e
-    
+      if e.code != "ENOENT"; throw e
     if prelude-cache-stat and prelude-src-stat.mtime.get-time() <= prelude-cache-stat.mtime.get-time()
-      let cache-prelude = if sync
-        fs.read-file-sync prelude-cache-path, "utf8"
-      else
-        yield to-promise! fs.read-file prelude-cache-path, "utf8"
+      let cache-prelude =  yield to-promise! fs.read-file prelude-cache-path, "utf8"
       let mutable errored = false
       try
         parsed-prelude-macros := parser.deserialize-prelude(cache-prelude)
@@ -60,36 +48,18 @@ let fetch-and-parse-prelude-macros = do
       catch e
         console.error "Error deserializing prelude, reloading. $(String(e.stack or e))"
         errored := true
-      if errored
-        if sync
-          fs.unlink-sync prelude-cache-path
-        else
-          yield to-promise! fs.unlink prelude-cache-path
+      if errored; yield to-promise! fs.unlink prelude-cache-path
     if not parsed-prelude-macros?
-      let prelude = if sync
-        fs.read-file-sync prelude-src-path, "utf8"
-      else
-        yield to-promise! fs.read-file prelude-src-path, "utf8"
-      let parsed-prelude = if sync
-        parser.sync prelude, null, { +serialize-macros, +sync, filename: prelude-src-path }
-      else
-        yield parser prelude, null, { +serialize-macros, filename: prelude-src-path }
+      let prelude = yield to-promise! fs.read-file prelude-src-path, "utf8"
+      let parsed-prelude = yield parser prelude, null, { +serialize-macros, filename: prelude-src-path }
       parsed-prelude-macros := parsed-prelude.macros
       write-file-with-mkdirp prelude-cache-path, parsed-prelude-macros.serialize(), "utf8"
     work := null
     prelude-promise := void
     parsed-prelude-macros
-  let f(sync as Boolean)
-    if parsed-prelude-macros?
-      if sync
-        parsed-prelude-macros
-      else
-        fulfilled! parsed-prelude-macros
-    else
-      if sync
-        work.sync true
-      else
-        prelude-promise ?= work()
+  let f()
+    if parsed-prelude-macros?; fulfilled! parsed-prelude-macros
+    else; prelude-promise ?= work()
 
   exports.get-serialized-prelude := promise! #*
     yield f()
@@ -103,20 +73,17 @@ let fetch-and-parse-prelude-macros = do
   f
 
 exports.parse := promise! #(source, options = {})*
-  let sync = options.sync
   let macros = if options.macros
     options.macros
   else if options.no-prelude
     null
-  else if sync
-    fetch-and-parse-prelude-macros(true)
   else
     yield fetch-and-parse-prelude-macros()
   
   let parse-options = {
     options.filename
     noindent: not not options.noindent
-    sync: not not options.sync
+    sync: false
     options.progress
   }
   if options.embedded
@@ -133,18 +100,13 @@ exports.parse := promise! #(source, options = {})*
       options.embedded-open-literal
       options.embedded-close-literal
     }
-  if sync
-    parser.sync(source, macros, parse-options)
-  else
-    yield parser(source, macros, parse-options)
-exports.parse-sync := #(source, options = {})
-  exports.parse.sync source, {} <<< options <<< {+sync}
+  yield parser(source, macros, parse-options)
 
-exports.get-reserved-words := #(options = {})
+exports.get-reserved-words := #(options = {})**
   if options.no-prelude
     parser.get-reserved-words(null, options)
   else
-    parser.get-reserved-words(fetch-and-parse-prelude-macros(true), options)
+    parser.get-reserved-words(yield fetch-and-parse-prelude-macros(true), options)
 
 let join-parsed-results(results)
   let joined-parsed = {
@@ -317,23 +279,15 @@ exports.compile-file := promise! #(mutable options = {})!*
     file-sources[input] := sources[i]
   node := handle-ast-pipe node, options, file-sources
   let compiled = node.compile options
-  unless sync
-    yield delay! 0
   let mutable code = compiled.code
   if source-map-file
     let linefeed = options.linefeed or "\n"
     let footer = "$(linefeed)//# sourceMappingURL=$(path.relative path.dirname(options.output), source-map-file)$(linefeed)"
     code &= footer
-  if sync
-    write-file-with-mkdirp-sync options.output, code, options.encoding or "utf8"
-  else
-    yield write-file-with-mkdirp options.output, code, options.encoding or "utf8"
+  yield write-file-with-mkdirp options.output, code, options.encoding or "utf8"
   if source-map-file
     // don't use options.encoding for source-maps, as in the spec, it's always utf8
-    if sync
-      write-file-with-mkdirp-sync source-map-file, options.source-map.to-string(), "utf8"
-    else
-      yield write-file-with-mkdirp source-map-file, options.source-map.to-string(), "utf8"
+    yield write-file-with-mkdirp source-map-file, options.source-map.to-string(), "utf8"
 exports.compile-file-sync := #(options = {})
   exports.compile-file.sync {} <<< options <<< {+sync}
 
@@ -417,10 +371,8 @@ exports.run-sync := #(source, options = {})
   exports.run.sync source, {} <<< options <<< {+sync}
 
 let init = exports.init := promise! #(options = {})!*
-  if options.sync
-    fetch-and-parse-prelude-macros(true)
-  else
     yield fetch-and-parse-prelude-macros()
+
 exports.init-sync := #(options = {})!
   init.sync {} <<< options <<< {+sync}
 

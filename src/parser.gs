@@ -6179,16 +6179,7 @@ class Parser
     macro-expand-all-walker@ this, node
   
   def macro-expand-all-promise(node)
-    if @options.sync
-      fulfilled! @macro-expand-all(node)
-    else
-      let defer = __defer()
-      @macro-expand-all-async node, #(err, result)
-        if err
-          defer.reject err
-        else
-          defer.fulfill result
-      defer.promise
+    fulfilled! @macro-expand-all(node)
   
   def clear-cache()! -> @cache := []
 
