@@ -4863,8 +4863,6 @@ let RootInnerP = promise! #(parser, index)*
   let mutable current-index = head.index
   while true
     parser.clear-cache()
-    unless parser.options.sync
-      yield fulfilled! void
     let separator = SomeEmptyLines parser, current-index
     if not separator
       break
@@ -4901,8 +4899,6 @@ let EmbeddedRootInnerP = promise! #(parser, index)*
   let mutable current-index = index
   while true
     parser.clear-cache()
-    unless parser.options.sync
-      yield fulfilled! void
     let item = EmbeddedLiteralTextInnerPartWithBlock parser, current-index
     if not item
       break
@@ -5000,12 +4996,9 @@ let RootP = promise! #(parser as Parser)*
       LValue empty.index, false
   for import-file in imports.value
     parser.clear-cache()
-    if parser.options.sync
-      parser.import-sync import-file, imports.index
-    else
-      yield parser.import import-file, imports.index
+    yield parser.import import-file, imports.index
   parser.clear-cache()
-  let root = if parser.options.sync then RootInnerP.sync parser, empty.index else yield RootInnerP parser, empty.index
+  let root = yield RootInnerP parser, empty.index
   parser.clear-cache()
   if not root
     return
@@ -5022,7 +5015,7 @@ let EmbeddedRootP = promise! #(parser as Parser)*
   let bom = BOM parser, 0
   let shebang = Shebang parser, bom.index
   parser.clear-cache()
-  let root = if parser.options.sync then EmbeddedRootInnerP.sync parser, shebang.index else yield EmbeddedRootInnerP parser, shebang.index
+  let root = yield EmbeddedRootInnerP parser, shebang.index
   parser.clear-cache()
   if not root
     return
@@ -5034,7 +5027,7 @@ let EmbeddedRootP = promise! #(parser as Parser)*
 
 let EmbeddedRootGeneratorP = promise! #(parser as Parser)*
   parser.in-generator.push true
-  let result = if parser.options.sync then EmbeddedRootP.sync parser else yield EmbeddedRootP parser
+  let result = yield EmbeddedRootP parser
   parser.in-generator.pop()
   return result
 
@@ -5222,27 +5215,14 @@ class Parser
     
     let full-filename = path.resolve path.dirname(@options.filename), filename
     
-    let source = if @options.sync
-      fs.read-file-sync full-filename, "utf8"
-    else
-      yield to-promise! fs.read-file full-filename, "utf8"
-    
+    let source = yield to-promise! fs.read-file full-filename, "utf8"
     let parse-options = {
       filename: full-filename
       noindent: @options.noindent
-      sync: @options.sync
     }
     
-    let result = if @options.sync
-      parse.sync(source, @macros, parse-options)
-    else
-      yield parse(source, @macros, parse-options)
+    let result = yield parse(source, @macros, parse-options)
     @macros := result.macros
-  
-  def import-sync(filename as String, index as Number)
-    if not @options.sync
-      throw Error "Expected options.sync to be true"
-    @import.sync@ this, filename, index
   
   def push-scope(is-top as Boolean, parent as Scope|null)
     let scope = (parent or @scope.peek()).clone(is-top)
@@ -6197,7 +6177,7 @@ let parse = promise! #(source as String, mutable macros as MacroHolder|null, opt
   let start-time = new Date().get-time()
   let mutable result = void
   try
-    result := if options.sync then root-rule.sync(parser) else yield root-rule parser
+    result := yield root-rule parser
   catch e == SHORT_CIRCUIT
     void
 

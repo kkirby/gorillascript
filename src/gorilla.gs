@@ -9,7 +9,7 @@ require! os
 require! fs
 require! path
 require! SourceMap: './source-map'
-let {write-file-with-mkdirp, write-file-with-mkdirp-sync} = require('./utils')
+let {write-file-with-mkdirp} = require('./utils')
 let {is-acceptable-ident} = require './jsutils'
 
 const DEFAULT_TRANSLATOR = './jstranslator'
@@ -17,21 +17,13 @@ const DEFAULT_TRANSLATOR = './jstranslator'
 exports.version := __VERSION__
 exports <<< {parser.ParserError, parser.MacroError}
 
-// TODO: Remove register-extension when fully deprecated.
-if require.extensions
-  require.extensions[".gs"] := #(module, filename)
-    let compiled = exports.compile-sync fs.read-file-sync(filename, "utf8"), { filename }
-    module._compile compiled.code, filename
-else if require.register-extension
-  require.register-extension ".gs", #(content) -> exports.compile-sync content, { filename }
-
 let real-__filename = if __filename? then fs.realpath-sync(__filename)
 let fetch-and-parse-prelude-macros = do
   let mutable parsed-prelude-macros = void
   let prelude-src-path = if real-__filename? then path.join(path.dirname(real-__filename), "../src/jsprelude.gs")
   let prelude-cache-path = if os? then path.join(os.tmp-dir(), "gs-jsprelude-$(exports.version).cache")
   let mutable prelude-promise = void
-  let mutable work = promise! #(sync)*
+  let mutable work = promise! #()*
     let prelude-src-stat = yield to-promise! fs.stat prelude-src-path
     let mutable prelude-cache-stat = void
     try
@@ -83,7 +75,6 @@ exports.parse := promise! #(source, options = {})*
   let parse-options = {
     options.filename
     noindent: not not options.noindent
-    sync: false
     options.progress
   }
   if options.embedded
@@ -141,7 +132,6 @@ let handle-ast-pipe(mutable node, options, file-sources)
 
 exports.ast := promise! #(source, options = {})*
   let start-time = new Date().get-time()
-  let sync = options.sync
   let translator = if is-function! options.translator
     options.translator
   else 
@@ -157,20 +147,14 @@ exports.ast := promise! #(source, options = {})*
     for item in source
       if is-array! options.filenames
         options.filename := options.filenames[i]
-      array.push if sync
-        exports.parse-sync item, options
-      else
-        yield exports.parse item, options
+      array.push yield exports.parse item, options
     options.progress := original-progress
     if is-function! original-progress
       for name in [\parse, \macro-expand, \reduce]
         options.progress name, progress-counts[name]
     join-parsed-results array
   else
-    if sync
-      exports.parse-sync source, options
-    else
-      yield exports.parse source, options
+    yield exports.parse source, options
   let translated = translator(parsed.result, parsed.macros, parsed.get-position, options)
 
   let file-sources = {}
@@ -189,16 +173,10 @@ exports.ast := promise! #(source, options = {})*
     ast-pipe-time: done-ast-pipe-time - start-ast-pipe-time
     time: done-ast-pipe-time - start-time
   }
-exports.ast-sync := #(source, options = {})
-  exports.ast.sync source, {} <<< options <<< {+sync}
 
-exports.compile := promise! #(source, options = {})*
-  let sync = options.sync
+exports.compile := #(source, options = {})**
   let start-time = new Date().get-time()
-  let translated = if sync
-    exports.ast-sync source, options
-  else
-    yield exports.ast source, options
+  let translated = yield exports.ast source, options
   let mutable node = translated.node
   let compiled = node.compile options
   return {
@@ -211,12 +189,9 @@ exports.compile := promise! #(source, options = {})*
     time: new Date().get-time() - start-time
     compiled.code
   }
-exports.compile-sync := #(source, options = {})
-  exports.compile.sync source, {} <<< options <<< {+sync}
 
 exports.compile-file := promise! #(mutable options = {})!*
   options := {} <<< options
-  let sync = options.sync
   let mutable inputs = options.input
   if is-string! inputs
     inputs := [inputs]
@@ -240,13 +215,8 @@ exports.compile-file := promise! #(mutable options = {})!*
       throw Error "Expected options.sourceMap.sourceRoot to be a string, got $(typeof! options.source-map.source-root)"
     source-map-file := options.source-map.file
     options.source-map := SourceMap(source-map-file, options.output, options.source-map.source-root)
-  let mutable sources = []
-  if sync
-    for input in inputs
-      sources.push fs.read-file-sync input, "utf8"
-  else
-    sources := yield promisefor(5) input in inputs
-      yield to-promise! fs.read-file input, "utf8"
+  let sources = yield promisefor(5) input in inputs
+    yield to-promise! fs.read-file input, "utf8"
   let original-progress = sources.length > 0 and options.progress
   let progress-counts = {parse: 0, macro-expand: 0, reduce: 0}
   if is-function! original-progress
@@ -255,10 +225,7 @@ exports.compile-file := promise! #(mutable options = {})!*
   let parsed = for source, i in sources
     let start-parse-time = Date.now()
     options.filename := inputs[i]
-    if sync
-      exports.parse-sync source, options
-    else
-      yield exports.parse source, options
+    yield exports.parse source, options
   if is-function! original-progress
     options.progress := original-progress
     for name in [\parse, \macro-expand, \reduce]
@@ -326,30 +293,17 @@ let evaluate(code, options)
     let fun = Function("return $code")
     fun()
 
-exports.eval := promise! #(source, options = {})*
-  let sync = options.sync
+exports.eval := #(source, options = {})**
   options.eval := true
   options.return := false
-  let compiled = if sync
-    exports.compile-sync source, options
-  else
-    yield exports.compile source, options
-  
+  let compiled = yield exports.compile source, options
   let start-time = new Date().get-time()
   let result = evaluate compiled.code, options
   options.progress?(\eval, new Date().get-time() - start-time)
   return result
 
-exports.eval-sync := #(source, options = {})
-  exports.eval.sync source, {} <<< options <<< {+sync}
-
-exports.run := promise! #(source, options = {})*
-  let sync = options.sync
-  if is-void! process
-    return if sync
-      exports.eval-sync(source, options)
-    else
-      yield exports.eval(source, options)
+exports.run := #(source, options = {})**
+  if is-void! process; return yield exports.eval(source, options)
   let main-module = require.main
   main-module.filename := (process.argv[1] := if options.filename
     fs.realpath-sync(options.filename)
@@ -360,21 +314,14 @@ exports.run := promise! #(source, options = {})*
     let {Module} = require('module')
     main-module.paths := Module._node-module-paths path.dirname options.filename
   if path.extname(main-module.filename) != ".gs" or require.extensions
-    let compiled = if sync
-      exports.compile-sync source, options
-    else
-      yield exports.compile source, options
+    let compiled = yield exports.compile source, options
     main-module._compile compiled.code, main-module.filename
   else
     main-module._compile source, main-module.filename
-exports.run-sync := #(source, options = {})
-  exports.run.sync source, {} <<< options <<< {+sync}
 
 let init = exports.init := promise! #(options = {})!*
     yield fetch-and-parse-prelude-macros()
 
-exports.init-sync := #(options = {})!
-  init.sync {} <<< options <<< {+sync}
 
 exports.get-mtime := promise! #(source)*
   let files = []
