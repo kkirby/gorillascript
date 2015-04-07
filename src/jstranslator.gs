@@ -767,7 +767,7 @@ let translate-lispy-internal = [] <<<
 
   [ParserNodeInternalId.Yield]: #(node, args, scope, location, unassigned)
     let t-node = translate args[0], scope, \expression, unassigned
-    # ast.Yield get-pos(node), t-node()
+    # ast.Yield get-pos(node), t-node(), args[1]?.value
 
   [ParserNodeInternalId.TmpWrapper]: #(node, args, scope, location, unassigned)
     let t-result = translate args[0], scope, location, unassigned

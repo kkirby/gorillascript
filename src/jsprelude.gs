@@ -3300,46 +3300,10 @@ macro yield
 		@mutate-last node, (#(subnode) -> @internal-call \yield, subnode), true
 
 macro yield*
-	syntax node as Expression
+	syntax node as Expression?
 		if not @in-generator
-			@error "Can only use yield* in a generator function"
-		let init = []
-		if @is-type node, \array-like
-			let index = @tmp \i, false
-			init.push AST let $index = 0
-			let length = @tmp \len, false
-			node := @cache node, init, \arr, false
-			init.push AST let $length as Number = $node.length
-			AST
-				for $init; $index ~< $length; $index ~+= 1
-					yield $node[$index]
-				void
-		else
-			let iterator = @cache ASTE __iter($node), init, \iter, false
-			let err = @tmp \e, true
-			let send = @tmp \send
-			let item = @tmp \item
-			let received = @tmp \tmp
-			AST
-				$init
-				let mutable $received = void
-				let mutable $send = true
-				
-				while true
-					let $item = if $send then $iterator.send($received) else $iterator.throw($received)
-					if $item.done
-						break
-					try
-						$received := yield $item.value
-						$send := true
-					catch $err
-						$received := $err
-						$send := false
-				try
-					$iterator.close()
-				catch $err
-					void
-				$item.value
+			@error "Can only use yield in a generator function"
+		@mutate-last node, (#(subnode) -> @internal-call \yield, subnode, @const(true)), true
 
 macro returning
 	syntax node as Expression, rest as DedentedBody
