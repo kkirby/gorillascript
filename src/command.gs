@@ -142,7 +142,7 @@ let main = promise!
   if argv.stdout
     options.writer := #(text) -> process.stdout.write text
   
-  let handle-code = promise! #(code)*
+  let handle-code = #(code)**
     let result = if argv.ast
       let ast = yield gorilla.ast code, options
       util.inspect ast.node, false, null

@@ -23,7 +23,7 @@ let fetch-and-parse-prelude-macros = do
   let prelude-src-path = if real-__filename? then path.join(path.dirname(real-__filename), "../src/jsprelude.gs")
   let prelude-cache-path = if os? then path.join(os.tmp-dir(), "gs-jsprelude-$(exports.version).cache")
   let mutable prelude-promise = void
-  let mutable work = promise! #()*
+  let mutable work = #**
     let prelude-src-stat = yield to-promise! fs.stat prelude-src-path
     let mutable prelude-cache-stat = void
     try
@@ -64,13 +64,10 @@ let fetch-and-parse-prelude-macros = do
     this
   f
 
-exports.parse := promise! #(source, options = {})*
-  let macros = if options.macros
-    options.macros
-  else if options.no-prelude
-    null
-  else
-    yield fetch-and-parse-prelude-macros()
+exports.parse := #(source, options = {})**
+  let macros = if options.macros; options.macros
+  else if options.no-prelude; null
+  else; yield fetch-and-parse-prelude-macros()
   
   let parse-options = {
     options.filename
@@ -130,7 +127,7 @@ let handle-ast-pipe(mutable node, options, file-sources)
     node := coverage node, file-sources, coverage-name
   node
 
-exports.ast := promise! #(source, options = {})*
+exports.ast := #(source, options = {})**
   let start-time = new Date().get-time()
   let translator = if is-function! options.translator
     options.translator
@@ -300,7 +297,7 @@ exports.eval := #(source, options = {})**
   let start-time = new Date().get-time()
   let result = evaluate compiled.code, options
   options.progress?(\eval, new Date().get-time() - start-time)
-  return result
+  result
 
 exports.run := #(source, options = {})**
   if is-void! process; return yield exports.eval(source, options)
@@ -322,8 +319,7 @@ exports.run := #(source, options = {})**
 let init = exports.init := promise! #(options = {})!*
     yield fetch-and-parse-prelude-macros()
 
-
-exports.get-mtime := promise! #(source)*
+exports.get-mtime := #(source)**
   let files = []
   files.push path.join(path.dirname(real-__filename), "../src/jsprelude.gs")
   let lib-dir = path.join(path.dirname(real-__filename), "../lib")

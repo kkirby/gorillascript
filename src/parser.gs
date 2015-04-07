@@ -4854,7 +4854,7 @@ let _Block-mutator(lines, parser, index)
   default
     LInternalCall \block, index, parser.scope.peek(), nodes
 
-let RootInnerP = promise! #(parser, index)*
+let RootInnerP = #(parser, index)**
   parser.clear-cache()
   let head = Line parser, index
   if not head
@@ -4894,7 +4894,7 @@ let EmbeddedBlock = sequential(
 
 let EmbeddedLiteralTextInnerPartWithBlock = one-of(EmbeddedLiteralTextInnerPart, EmbeddedBlock)
 
-let EmbeddedRootInnerP = promise! #(parser, index)*
+let EmbeddedRootInnerP = #(parser, index)**
   let nodes = []
   let mutable current-index = index
   while true
@@ -4980,7 +4980,7 @@ let Imports = maybe separated-list(
     x.const-value()
   SomeEmptyLines), # []
 
-let RootP = promise! #(parser as Parser)*
+let RootP = #(parser as Parser)**
   let bom = BOM parser, 0
   let shebang = Shebang parser, bom.index
   let mutable empty = EmptyLines parser, shebang.index
@@ -5011,7 +5011,7 @@ let RootP = promise! #(parser as Parser)*
     LValue empty.index, false
     LValue empty.index, false
 
-let EmbeddedRootP = promise! #(parser as Parser)*
+let EmbeddedRootP = #(parser as Parser)**
   let bom = BOM parser, 0
   let shebang = Shebang parser, bom.index
   parser.clear-cache()
@@ -5025,7 +5025,7 @@ let EmbeddedRootP = promise! #(parser as Parser)*
     LValue shebang.index, true
     LValue shebang.index, parser.in-generator.peek()
 
-let EmbeddedRootGeneratorP = promise! #(parser as Parser)*
+let EmbeddedRootGeneratorP = #(parser as Parser)**
   parser.in-generator.push true
   let result = yield EmbeddedRootP parser
   parser.in-generator.pop()
@@ -6163,7 +6163,7 @@ class Parser
   
   def clear-cache()! -> @cache := []
 
-let parse = promise! #(source as String, mutable macros as MacroHolder|null, options as {} = {})*
+let parse = #(source as String, mutable macros as MacroHolder|null, options as {} = {})**
   let mutable parser = Parser source, macros?.clone(), options
   macros := parser.macros
   
