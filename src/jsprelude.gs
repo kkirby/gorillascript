@@ -3713,17 +3713,16 @@ macro helper __generator-to-promise = #(func)
 	#()
 		let iter = func.apply(this,arguments)
 		new Promise #(fulfill,reject)
-			let next(result)
-				let info = try; iter.next(result)
+			let next(result,handler = \next)
+				let info = try; iter[handler](result)
 				catch e; return reject e
 				if info.done; fulfill info.value
 				else if info.value instanceof Promise
 					info.value.then(
 						#(result) -> next(result)
-						#(e)
-							try; iter.throw e
-							catch e; reject e
+						#(e) -> next e, \throw
 					)
+				else; next info.value
 			next()
 
 macro promise!
