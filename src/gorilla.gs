@@ -43,7 +43,7 @@ let fetch-and-parse-prelude-macros = do
       if errored; yield to-promise! fs.unlink prelude-cache-path
     if not parsed-prelude-macros?
       let prelude = yield to-promise! fs.read-file prelude-src-path, "utf8"
-      let parsed-prelude = yield parser prelude, null, { +serialize-macros, filename: prelude-src-path }
+      let parsed-prelude = parser prelude, null, { +serialize-macros, filename: prelude-src-path }
       parsed-prelude-macros := parsed-prelude.macros
       write-file-with-mkdirp prelude-cache-path, parsed-prelude-macros.serialize(), "utf8"
     work := null
@@ -88,7 +88,7 @@ exports.parse := #(source, options = {})**
       options.embedded-open-literal
       options.embedded-close-literal
     }
-  yield parser(source, macros, parse-options)
+  parser(source, macros, parse-options)
 
 exports.get-reserved-words := #(options = {})**
   if options.no-prelude
