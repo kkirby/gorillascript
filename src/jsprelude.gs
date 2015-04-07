@@ -3937,40 +3937,39 @@ macro helper __promise-iter = #(mutable limit as Number, iterator as {next: Func
 	let result = []
 	let mutable done = false
 	let mutable slots-used = 0
-	let {reject, fulfill, promise} = __defer()
-	let mutable index = 0
-	let mutable iter-stopped = false
-	let handle(item, index)
-		slots-used += 1
-		body(item, index).then(
-			#(value)
-				result[index] := value
-				slots-used -= 1
-				flush()
-			#(reason)
-				done := true
-				reject reason)
-	let flush()
-		while not done and not iter-stopped and slots-used < limit
-			let mutable item = void
-			try
-				item := iterator.next()
-			catch e
-				done := true
-				reject e
-				return
+	new Promise #(fulfill,reject)
+  	let mutable index = 0
+  	let mutable iter-stopped = false
+  	let handle(item, index)
+  		slots-used += 1
+  		body(item, index).then(
+  			#(value)
+  				result[index] := value
+  				slots-used -= 1
+  				flush()
+  			#(reason)
+  				done := true
+  				reject reason)
+  	let flush()
+  		while not done and not iter-stopped and slots-used < limit
+  			let mutable item = void
+  			try
+  				item := iterator.next()
+  			catch e
+  				done := true
+  				reject e
+  				return
 			
-			if item.done
-				iter-stopped := true
-				break
+  			if item.done
+  				iter-stopped := true
+  				break
 			
-			handle(item.value, post-inc! index)
+  			handle(item.value, post-inc! index)
 		
-		if not done and slots-used == 0 and iter-stopped
-			done := true
-			fulfill result
-	set-immediate flush
-	promise
+  		if not done and slots-used == 0 and iter-stopped
+  			done := true
+  			fulfill result
+  	set-immediate flush
 
 macro promisefor
 	syntax "(", parallelism as Expression, ")", value as Declarable, index as (",", value as Identifier, length as (",", this as Identifier)?)?, "in", array, body as GeneratorBody
