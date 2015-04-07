@@ -196,32 +196,28 @@ exports.start := #(options = {})
 
     let code = backlog
     backlog := ""
-    let p = if pipe
-      promise!
-        let compiled = yield gorilla.compile code, { eval: true, filename: \repl, modulename: \repl }
+    try
+      if pipe
+        let compiled = gorilla.compile code, { eval: true, filename: \repl, modulename: \repl }
         pipe.stdin.write compiled.code
-    else if options.stdout
-      promise!
-        let compiled = yield gorilla.compile code, { bare: true, return: true, filename: \repl, modulename: \repl }
+      else if options.stdout
+        let compiled = gorilla.compile code, { bare: true, return: true, filename: \repl, modulename: \repl }
         process.stdout.write compiled.code & "\n"
         repl.prompt()
-    else if options.ast
-      promise!
-        let ret = yield gorilla.ast code, { sandbox, filename: \repl, modulename: \repl }
+      else if options.ast
+        let ret = gorilla.ast code, { sandbox, filename: \repl, modulename: \repl }
         process.stdout.write util.inspect(ret.node, false, 2, enable-colors) & "\n"
         repl.prompt()
-    else if options.parse
-      promise!
-        let ret = yield gorilla.parse code, { sandbox, filename: \repl, modulename: \repl }
+      else if options.parse
+        let ret = gorilla.parse code, { sandbox, filename: \repl, modulename: \repl }
         process.stdout.write util.inspect(ret.result, false, 2, enable-colors) & "\n"
         repl.prompt()
-    else
-      promise!
-        let ret = yield gorilla.eval code, { sandbox, filename: \repl, modulename: \repl }
+      else
+        let ret = gorilla.eval code, { sandbox, filename: \repl, modulename: \repl }
         if not is-void! ret
           process.stdout.write util.inspect(ret, false, 2, enable-colors) & "\n"
         repl.prompt()
-    p.then null, #(err)
+    catch err
       process.stderr.write String(err?.stack or err) & "\n"
       repl.prompt()
 

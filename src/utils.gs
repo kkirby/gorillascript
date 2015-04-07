@@ -116,25 +116,22 @@ let is-primordial = do
   }
   #(name as String) -> PRIMORDIAL_GLOBALS ownskey name
 
-let fs-exists-promise(path)
-  new Promise #(fulfill) -> fs.exists path, fulfill
-
-let mkdirp = promise! #(dirpath, mutable mode)!*
+let mkdirp = #(dirpath, mutable mode)!
   if not mode?
     mode := 0o777 bitand (bitnot process.umask())
   for reduce part in dirpath.split(r"[/\\]"g), acc = if dirpath.char-at(0) == "/" then "/" else ""
     let current = path.resolve path.join acc, part
-    let exists = yield fs-exists-promise current
+    let exists = fs.exists-sync current
     if not exists
       try
-        yield to-promise! fs.mkdir current, mode
+        fs.mkdir-sync current, mode
       catch e
         throw Error "Unable to create directory '$current' (Error code: $(e.code))"
     current
 
-let write-file-with-mkdirp = promise! #(filepath, text, encoding)!*
-  yield mkdirp path.dirname(filepath)
-  yield to-promise! fs.write-file filepath, text, encoding
+let write-file-with-mkdirp = #(filepath, text, encoding)!
+  mkdirp path.dirname(filepath)
+  fs.write-file-sync filepath, text, encoding
 
 exports <<< {
   string-repeat

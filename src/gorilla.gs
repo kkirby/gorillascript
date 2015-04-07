@@ -23,15 +23,15 @@ let fetch-and-parse-prelude-macros = do
   let prelude-src-path = if real-__filename? then path.join(path.dirname(real-__filename), "../src/jsprelude.gs")
   let prelude-cache-path = if os? then path.join(os.tmp-dir(), "gs-jsprelude-$(exports.version).cache")
   let mutable prelude-promise = void
-  let mutable work = #**
-    let prelude-src-stat = yield to-promise! fs.stat prelude-src-path
+  let mutable work = #
+    let prelude-src-stat = fs.stat-sync prelude-src-path
     let mutable prelude-cache-stat = void
     try
-      prelude-cache-stat := yield to-promise! fs.stat prelude-cache-path
+      prelude-cache-stat := fs.stat-sync prelude-cache-path
     catch e
       if e.code != "ENOENT"; throw e
     if prelude-cache-stat and prelude-src-stat.mtime.get-time() <= prelude-cache-stat.mtime.get-time()
-      let cache-prelude =  yield to-promise! fs.read-file prelude-cache-path, "utf8"
+      let cache-prelude =  fs.read-file-sync prelude-cache-path, "utf8"
       let mutable errored = false
       try
         parsed-prelude-macros := parser.deserialize-prelude(cache-prelude)
@@ -40,9 +40,9 @@ let fetch-and-parse-prelude-macros = do
       catch e
         console.error "Error deserializing prelude, reloading. $(String(e.stack or e))"
         errored := true
-      if errored; yield to-promise! fs.unlink prelude-cache-path
+      if errored; fs.unlink-sync prelude-cache-path
     if not parsed-prelude-macros?
-      let prelude = yield to-promise! fs.read-file prelude-src-path, "utf8"
+      let prelude = fs.read-file-sync prelude-src-path, "utf8"
       let parsed-prelude = parser prelude, null, { +serialize-macros, filename: prelude-src-path }
       parsed-prelude-macros := parsed-prelude.macros
       write-file-with-mkdirp prelude-cache-path, parsed-prelude-macros.serialize(), "utf8"
@@ -50,12 +50,12 @@ let fetch-and-parse-prelude-macros = do
     prelude-promise := void
     parsed-prelude-macros
   let f()
-    if parsed-prelude-macros?; fulfilled! parsed-prelude-macros
+    if parsed-prelude-macros?; parsed-prelude-macros
     else; prelude-promise ?= work()
 
-  exports.get-serialized-prelude := promise! #*
-    yield f()
-    return yield to-promise! fs.read-file prelude-cache-path, "utf8"
+  exports.get-serialized-prelude := #
+    f()
+    return fs.read-file-sync prelude-cache-path, "utf8"
   
   exports.with-prelude := #(serialized-prelude as ->)
     exports.with-prelude := #-> throw Error("Cannot provide a prelude more than once")
@@ -64,10 +64,10 @@ let fetch-and-parse-prelude-macros = do
     this
   f
 
-exports.parse := #(source, options = {})**
+exports.parse := #(source, options = {})
   let macros = if options.macros; options.macros
   else if options.no-prelude; null
-  else; yield fetch-and-parse-prelude-macros()
+  else; fetch-and-parse-prelude-macros()
   
   let parse-options = {
     options.filename
@@ -90,11 +90,11 @@ exports.parse := #(source, options = {})**
     }
   parser(source, macros, parse-options)
 
-exports.get-reserved-words := #(options = {})**
+exports.get-reserved-words := #(options = {})
   if options.no-prelude
     parser.get-reserved-words(null, options)
   else
-    parser.get-reserved-words(yield fetch-and-parse-prelude-macros(true), options)
+    parser.get-reserved-words(fetch-and-parse-prelude-macros(true), options)
 
 let join-parsed-results(results)
   let joined-parsed = {
@@ -127,7 +127,7 @@ let handle-ast-pipe(mutable node, options, file-sources)
     node := coverage node, file-sources, coverage-name
   node
 
-exports.ast := #(source, options = {})**
+exports.ast := #(source, options = {})
   let start-time = new Date().get-time()
   let translator = if is-function! options.translator
     options.translator
@@ -144,14 +144,13 @@ exports.ast := #(source, options = {})**
     for item in source
       if is-array! options.filenames
         options.filename := options.filenames[i]
-      array.push yield exports.parse item, options
+      array.push exports.parse item, options
     options.progress := original-progress
     if is-function! original-progress
       for name in [\parse, \macro-expand, \reduce]
         options.progress name, progress-counts[name]
     join-parsed-results array
-  else
-    yield exports.parse source, options
+  else; exports.parse source, options
   let translated = translator(parsed.result, parsed.macros, parsed.get-position, options)
 
   let file-sources = {}
@@ -171,9 +170,9 @@ exports.ast := #(source, options = {})**
     time: done-ast-pipe-time - start-time
   }
 
-exports.compile := #(source, options = {})**
+exports.compile := #(source, options = {})
   let start-time = new Date().get-time()
-  let translated = yield exports.ast source, options
+  let translated = exports.ast source, options
   let mutable node = translated.node
   let compiled = node.compile options
   return {
@@ -187,7 +186,7 @@ exports.compile := #(source, options = {})**
     compiled.code
   }
 
-exports.compile-file := promise! #(mutable options = {})!*
+exports.compile-file := #(mutable options = {})!
   options := {} <<< options
   let mutable inputs = options.input
   if is-string! inputs
@@ -212,8 +211,7 @@ exports.compile-file := promise! #(mutable options = {})!*
       throw Error "Expected options.sourceMap.sourceRoot to be a string, got $(typeof! options.source-map.source-root)"
     source-map-file := options.source-map.file
     options.source-map := SourceMap(source-map-file, options.output, options.source-map.source-root)
-  let sources = yield promisefor(5) input in inputs
-    yield to-promise! fs.read-file input, "utf8"
+  let sources = for input in inputs; fs.read-file-sync input, "utf8"
   let original-progress = sources.length > 0 and options.progress
   let progress-counts = {parse: 0, macro-expand: 0, reduce: 0}
   if is-function! original-progress
@@ -222,7 +220,7 @@ exports.compile-file := promise! #(mutable options = {})!*
   let parsed = for source, i in sources
     let start-parse-time = Date.now()
     options.filename := inputs[i]
-    yield exports.parse source, options
+    exports.parse source, options
   if is-function! original-progress
     options.progress := original-progress
     for name in [\parse, \macro-expand, \reduce]
@@ -248,12 +246,10 @@ exports.compile-file := promise! #(mutable options = {})!*
     let linefeed = options.linefeed or "\n"
     let footer = "$(linefeed)//# sourceMappingURL=$(path.relative path.dirname(options.output), source-map-file)$(linefeed)"
     code &= footer
-  yield write-file-with-mkdirp options.output, code, options.encoding or "utf8"
+  write-file-with-mkdirp options.output, code, options.encoding or "utf8"
   if source-map-file
     // don't use options.encoding for source-maps, as in the spec, it's always utf8
-    yield write-file-with-mkdirp source-map-file, options.source-map.to-string(), "utf8"
-exports.compile-file-sync := #(options = {})
-  exports.compile-file.sync {} <<< options <<< {+sync}
+    write-file-with-mkdirp source-map-file, options.source-map.to-string(), "utf8"
 
 let evaluate(code, options)
   let vm = require?('vm')
@@ -290,17 +286,17 @@ let evaluate(code, options)
     let fun = Function("return $code")
     fun()
 
-exports.eval := #(source, options = {})**
+exports.eval := #(source, options = {})
   options.eval := true
   options.return := false
-  let compiled = yield exports.compile source, options
+  let compiled = exports.compile source, options
   let start-time = new Date().get-time()
   let result = evaluate compiled.code, options
   options.progress?(\eval, new Date().get-time() - start-time)
   result
 
-exports.run := #(source, options = {})**
-  if is-void! process; return yield exports.eval(source, options)
+exports.run := #(source, options = {})
+  if is-void! process; return exports.eval(source, options)
   let main-module = require.main
   main-module.filename := (process.argv[1] := if options.filename
     fs.realpath-sync(options.filename)
@@ -311,29 +307,24 @@ exports.run := #(source, options = {})**
     let {Module} = require('module')
     main-module.paths := Module._node-module-paths path.dirname options.filename
   if path.extname(main-module.filename) != ".gs" or require.extensions
-    let compiled = yield exports.compile source, options
+    let compiled = exports.compile source, options
     main-module._compile compiled.code, main-module.filename
   else
     main-module._compile source, main-module.filename
 
-let init = exports.init := promise! #(options = {})!*
-    yield fetch-and-parse-prelude-macros()
+let init = exports.init := #(options = {})!
+    fetch-and-parse-prelude-macros()
 
-exports.get-mtime := #(source)**
+exports.get-mtime := #(source)
   let files = []
   files.push path.join(path.dirname(real-__filename), "../src/jsprelude.gs")
   let lib-dir = path.join(path.dirname(real-__filename), "../lib")
-  let lib-files = yield to-promise! fs.readdir lib-dir
+  let lib-files = fs.readdir-sync lib-dir
   for lib-file in lib-files
     if path.extname(lib-file) == ".js"
       files.push path.join lib-dir, lib-file
-  let file-stats-p = every-promise! for file in files
-    to-promise! fs.stat file
-  
-  let file-stats = try
-    yield file-stats-p
-  catch
-    return new Date()
+  let mutable file-stats = for file in files; fs.stat-sync file
+  if file-stats.length == 0; file-stats := new Date()
   
   let time = for reduce stat in file-stats, acc = -(2 ^ 52)
     acc max stat.mtime.get-time()
