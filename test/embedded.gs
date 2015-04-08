@@ -203,7 +203,7 @@ describe "embedded compilation", #
     <% let iter = f()
        let mutable next-value = void
        while true:
-         let item = iter.send(next-value)
+         let item = iter.next(next-value)
          if item.done:
            break
          end %>
@@ -229,18 +229,16 @@ describe "embedded compilation", #
       text.push String x
     
     let iter = template write, {}
-    expect(iter).to.have.property(\iterator).that.is.a \function
     expect(iter).to.have.property(\next).that.is.a \function
-    expect(iter).to.have.property(\send).that.is.a \function
     expect(iter).to.have.property(\throw).that.is.a \function
     expect(text).to.be.empty
     
-    expect(iter.send void).to.eql { -done, value: "name" }
+    expect(iter.next void).to.eql { -done, value: "name" }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello,"
-    expect(iter.send "world").to.eql { +done, value: write }
+    expect(iter.next "world").to.eql { +done, value: write }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello, world. How are you today?"
     for i in 0 til 10
-      expect(iter.send void).to.eql { +done, value: void }
+      expect(iter.next void).to.eql { +done, value: void }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello, world. How are you today?"
 
   it "as a generator, should allow yield* in the main body", #
@@ -257,20 +255,18 @@ describe "embedded compilation", #
       text.push String x
     
     let iter = template write, {}
-    expect(iter).to.have.property(\iterator).that.is.a \function
     expect(iter).to.have.property(\next).that.is.a \function
-    expect(iter).to.have.property(\send).that.is.a \function
     expect(iter).to.have.property(\throw).that.is.a \function
     expect(text).to.be.empty
     
-    expect(iter.send void).to.eql { -done, value: "hello" }
+    expect(iter.next void).to.eql { -done, value: "hello" }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello,"
-    expect(iter.send void).to.eql { -done, value: "there" }
+    expect(iter.next void).to.eql { -done, value: "there" }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello,"
-    expect(iter.send "world").to.eql { +done, value: write }
+    expect(iter.next "world").to.eql { +done, value: write }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello, world. How are you today?"
     for i in 0 til 10
-      expect(iter.send void).to.eql { +done, value: void }
+      expect(iter.next void).to.eql { +done, value: void }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello, world. How are you today?"
 
   it "should allow a for loop within an embed write", #
@@ -285,16 +281,14 @@ describe "embedded compilation", #
       text.push String x
     
     let iter = template write, {}
-    expect(iter).to.have.property(\iterator).that.is.a \function
     expect(iter).to.have.property(\next).that.is.a \function
-    expect(iter).to.have.property(\send).that.is.a \function
     expect(iter).to.have.property(\throw).that.is.a \function
     expect(text).to.be.empty
     
-    expect(iter.send void).to.eql { +done, value: write }
+    expect(iter.next void).to.eql { +done, value: write }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello, 1,2,3. How are you today?"
     for i in 0 til 10
-      expect(iter.send void).to.eql { +done, value: void }
+      expect(iter.next void).to.eql { +done, value: void }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello, 1,2,3. How are you today?"
   
   it "allows literal segments", #
