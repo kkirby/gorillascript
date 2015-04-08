@@ -88,19 +88,17 @@ let argv = optimist.argv
 let read-stdin = #
   let bufferSize = 256
   let buffer = new Buffer bufferSize
+  let mutable totalBytesRead = 0
   while true
     let bytesRead = try
-      fs.readSync process.stdin.fd, buffer, bufferSize
+      fs.readSync process.stdin.fd, buffer, 0, bufferSize
     catch e
-      if e.code == \EAGAIN
-        process.exit 1
-      else if e.code == \EOF
-        break
-      else
-        throw e
-    if bytesRead == 0
-      break
-  buffer.toString(null, 0, bytesRead)
+      if e.code == \EAGAIN; process.exit 1
+      else if e.code == \EOF; break
+      else; throw e
+    totalBytesRead += bytesRead
+    if bytesRead == 0; break
+  buffer.toString(null, 0, totalBytesRead)
 
 macro timer!
   syntax body as Body
