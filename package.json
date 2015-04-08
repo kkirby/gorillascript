@@ -6,6 +6,15 @@
     "name": "Cameron Kenneth Knight",
     "email": "ckknight@gmail.com"
   },
+  "contributors": [
+	  {
+		  "name": "Kyle Kirbatski" ,
+		  "email": "kylekirby@optimalconnection.net"
+	  },
+	  {
+		  "name": "unc0"
+	  }
+  ],
   "keywords": [
     "compile",
     "language",
