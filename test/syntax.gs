@@ -31,7 +31,7 @@ describe "let", #
   describe "as a function", #
     it "does not allow primordials to be declared", #
       for prim in ["Object", "Math", "Function"]
-        expect(#-> gorilla.compile-sync """
+        expect(#-> gorilla.compile """
         let x = 0
         let $prim() ->
         """).throws gorilla.MacroError, r"^Cannot declare primordial '$prim'.*2:\d+\$"
@@ -39,7 +39,7 @@ describe "let", #
   describe "as an assignment", #
     it "does not allow primordials to be declared", #
       for prim in ["Object", "Math", "Function"]
-        expect(#-> gorilla.compile-sync """
+        expect(#-> gorilla.compile """
         let x = 0
         let $prim = 0
         """).throws gorilla.MacroError//, r"^Cannot declare primordial '$prim'.*2:\d+$"

@@ -3,14 +3,14 @@ let gorilla = require('../index')
 
 describe "License comments", #
   it "should appear in result code", #
-    expect(gorilla.compile-sync("""
+    expect(gorilla.compile("""
     /*!
       This is my license
     */
     """).code).to.contain("This is my license")
   
   it "should error if it never ends", #
-    expect(#-> gorilla.compile-sync """
+    expect(#-> gorilla.compile """
     let x = 0
     /*!
       This is my license
@@ -18,7 +18,7 @@ describe "License comments", #
 
 describe "Multi-line comments", #
   it "should error if it never ends", #
-    expect(#-> gorilla.compile-sync """
+    expect(#-> gorilla.compile """
     let x = 0
     /*
       This is a comment

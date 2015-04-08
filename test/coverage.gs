@@ -4,7 +4,7 @@ let coverage = require (if process.env.GORILLA_COV then '../lib-cov/coverage' el
 
 describe "coverage", #
   it "adds _\$jscoverage transforms", #
-    let x = gorilla.compile-sync """
+    let x = gorilla.compile """
     console.log "Hello, world!"
     console.log "I hope you're well today."
     let f()
@@ -18,7 +18,7 @@ describe "coverage", #
     expect(x.code).to.match r'\+\+_\$jscoverage\["blah.gs"\]\[\d+\]'
   
   it "adds custom coverage transforms", #
-    let x = gorilla.compile-sync """
+    let x = gorilla.compile """
     console.log "Hello, world!"
     console.log "I hope you're well today."
     let f()

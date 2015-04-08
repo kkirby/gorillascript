@@ -4,7 +4,7 @@ let ast = require (if process.env.GORILLA_COV then '../lib-cov/jsast' else '../l
 
 describe "ast-pipe", #
   it "can alter the AST of the JavaScript", #
-    let x = gorilla.compile-sync """
+    let x = gorilla.compile """
     console.log "Hello, world!"
     """, ast-pipe: #(node)
       node.walk #(subnode)
