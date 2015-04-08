@@ -2275,13 +2275,13 @@ exports.Yield := class Yield extends Expression
   def constructor(@pos as {}, @node as Expression,@passThru) ->
 
   def compile(options, level, line-start, sb)!
-    if level > 5; sb "("
+    if level > 2; sb "("
     sb "yield"
     if @passThru
       sb "*"
     sb " "
     @node.compile options, Level.inside-parentheses, false, sb
-    if level > 5; sb ")"
+    if level > 2; sb ")"
 
   def compile-as-block(options, level, line-start, sb)!
     Noop(@pos).compile-as-block(options, level, line-start, sb)
