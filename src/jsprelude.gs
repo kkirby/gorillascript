@@ -3297,7 +3297,7 @@ macro yield
 	syntax node as Expression?
 		if not @in-generator
 			@error "Can only use yield in a generator function"
-		@mutate-last node, (#(subnode) -> @internal-call \yield, subnode), true
+		@mutate-last node, (#(subnode) -> @internal-call \yield, subnode, @const(false)), true
 
 macro yield*
 	syntax node as Expression?

@@ -2294,7 +2294,7 @@ exports.Yield := class Yield extends Expression
         this
 
   def type-id = AstType.Yield
-  def _to-ast(pos, ident) -> [@node.to-ast(pos, ident).concat(@passThru)]
+  def _to-ast(pos, ident) -> [@node.to-ast(pos, ident),Const(pos,@passThru)]
   @_from-ast := #(pos, node, passThru) -> Yield pos, node, passThru
   def _to-JSON() -> @node.to-JSON().concat(@passThru)
   @from-JSON := #(line, column, file, source, ...node,passThru) -> Yield make-pos(line, column, file), from-JSON(node), passThru
