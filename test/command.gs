@@ -112,7 +112,7 @@ describe "gorilla binary", #
         async error, stdout, stderr <- exec "node $tmp-binary-js alpha bravo charlie"
         expect(error).to.not.exist
         expect(stderr).to.be.empty
-        expect(stdout.trim()).to.equal inspect(["node", tmp-binary-js, "alpha", "bravo", "charlie"])
+        expect(stdout.trim()).to.equal inspect([process.argv.shift(), tmp-binary-js, "alpha", "bravo", "charlie"])
         async! cb <- fs.unlink tmp-binary-gs
         async! cb <- fs.unlink tmp-binary-js
         cb()
