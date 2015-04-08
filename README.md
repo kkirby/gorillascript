@@ -22,7 +22,7 @@ I'm sure there is much more that could be added to really make GS a great langua
 
 ##Release
 
-As of April 8th, a community release of GorillaScript has been made, upping the version from 0.9.10 to 0.10.0. Check out the (release)[RELEASE.md] for details.
+As of April 8th, a community release of GorillaScript has been made, upping the version from 0.9.10 to 0.10.0. Check out the [release](RELEASE.md) for details.
 
 === Original Readme ===
 
