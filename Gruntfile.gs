@@ -128,7 +128,13 @@ module.exports := #(grunt)
       #(e)
         grunt.log.error e?.stack or e
         done(false))
-  grunt.register-task "test", ["clean:test", "gorilla:test", "mochaTest:test"]
+  grunt.register-task "test", #
+    if @args.length > 0
+      grunt.config(
+        'gorilla.test.files.0.src',
+        @args.map #(arg) -> "**/$(arg).gs"
+      )
+    grunt.task.run(["clean:test", "gorilla:test", "mochaTest:test"])
   grunt.register-task "check-env-cov", "Verify that GORILLA_COV is set", #
     unless process.env.GORILLASCRIPT_COV
       grunt.log.error "You must set the GORILLASCRIPT_COV environment variable"

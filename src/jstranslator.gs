@@ -767,7 +767,7 @@ let translate-lispy-internal = [] <<<
 
   [ParserNodeInternalId.Yield]: #(node, args, scope, location, unassigned)
     let t-node = translate args[0], scope, \expression, unassigned
-    # ast.Yield get-pos(node), t-node()
+    # ast.Yield get-pos(node), t-node(), args[1]?.value
 
   [ParserNodeInternalId.TmpWrapper]: #(node, args, scope, location, unassigned)
     let t-result = translate args[0], scope, location, unassigned
@@ -986,19 +986,25 @@ let translate-root(mutable roots as Object, mutable scope as Scope, mutable get-
         [
           ...comments-body.comments
           ast.Return body.pos,
-            wrap ast.Func body.pos,
-              null
-              [
-                ast.Ident body.pos, \write
-                ast.Ident body.pos, \context
-              ]
-              scope.get-variables()
-              ast.Block body.pos, [
-                ast.If body.pos,
-                  ast.Binary body.pos, ast.Ident(body.pos, \context), "==", ast.Const(body.pos, null)
-                  ast.Assign body.pos, ast.Ident(body.pos, \context), ast.Obj(body.pos)
-                body
-              ]
+            wrap(
+              ast.Func(
+                body.pos
+                null
+                [
+                  ast.Ident body.pos, \write
+                  ast.Ident body.pos, \context
+                ]
+                scope.get-variables()
+                ast.Block body.pos, [
+                  ast.If body.pos,
+                    ast.Binary body.pos, ast.Ident(body.pos, \context), "==", ast.Const(body.pos, null)
+                    ast.Assign body.pos, ast.Ident(body.pos, \context), ast.Obj(body.pos)
+                  body
+                ]
+                []
+                root.args[3].const-value()
+              )
+            )
         ]
     else
       wrap body

@@ -1,5 +1,17 @@
 let {expect} = require 'chai'
 
+let __defer = do
+  let res = #
+    let mutable fulfill = null
+    let mutable reject = null
+    let promise = new Promise #(_fulfill,_reject)
+      fulfill := _fulfill
+      reject := _reject
+    {promise,fulfill,reject}
+  res.fulfilled := #(...value) -> Promise.resolve(...value)
+  res.rejected := #(...value) -> Promise.reject(...value)
+  res
+
 let random-wait(value, max-time = 10)
   //delay! (Math.random() * max-time) \ 1, value
   let defer = __defer()

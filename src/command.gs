@@ -86,14 +86,19 @@ optimist.check #(argv)
 let argv = optimist.argv
 
 let read-stdin = #
-  let defer = __defer()
-  let mutable buffer = ""
-  process.stdin.on 'data', #(chunk)
-    buffer &= chunk.to-string()
-  process.stdin.on 'end', #
-    defer.fulfill buffer
-  process.stdin.resume()
-  defer.promise
+  let bufferSize = 256
+  let buffer = new Buffer bufferSize
+  let mutable totalBytesRead = 0
+  while true
+    let bytesRead = try
+      fs.readSync process.stdin.fd, buffer, 0, bufferSize
+    catch e
+      if e.code == \EAGAIN; process.exit 1
+      else if e.code == \EOF; break
+      else; throw e
+    totalBytesRead += bytesRead
+    if bytesRead == 0; break
+  buffer.toString(null, 0, totalBytesRead)
 
 macro timer!
   syntax body as Body
@@ -104,7 +109,7 @@ macro timer!
       new Date().get-time() - $time
 
 let filenames = argv._
-let main = promise!
+let main = #
   if argv.help
     return optimist.show-help(console.log)
   
@@ -124,10 +129,8 @@ let main = promise!
   if argv.coverage
     options.coverage := true
 
-  if argv["no-prelude"]
-    options.no-prelude := true
-  else
-    yield gorilla.init()
+  if argv["no-prelude"]; options.no-prelude := true
+  else; gorilla.init()
   
   if argv.interactive or (not filenames.length and not argv.stdin and not argv.eval)
     let repl-opts = {
@@ -142,33 +145,35 @@ let main = promise!
   if argv.stdout
     options.writer := #(text) -> process.stdout.write text
   
-  let handle-code = promise! #(code)*
+  let handle-code = #(code)
     let result = if argv.ast
-      let ast = yield gorilla.ast code, options
+      let ast = gorilla.ast code, options
       util.inspect ast.node, false, null
     else if argv.parse
-      let nodes = yield gorilla.parse code, options
+      let nodes = gorilla.parse code, options
       util.inspect nodes.result, false, null
     else if argv.stdout
-      let compiled = yield gorilla.compile code, options
+      let compiled = gorilla.compile code, options
       if options.uglify
         process.stdout.write "\n"
       compiled.code
     else if argv.gjs
-      let compiled = yield gorilla.compile code, { +\eval } <<< options
+      let compiled = gorilla.compile code, { +\eval } <<< options
       console.log "running with gjs"
       let gjs = child_process.spawn "gjs"
       gjs.stdout.on 'data', #(data) -> process.stdout.write data
       gjs.stderr.on 'data', #(data) -> process.stderr.write data
       gjs.stdin.write compiled.code
-      yield delay! 50_ms
-      gjs.stdin.end()
+      setTimeout(
+        # -> gjs.stdin.end(),
+        50_ms
+      )
       ""
     else if argv.eval
-      let evaled = yield gorilla.eval code, options
+      let evaled = gorilla.eval code, options
       util.inspect evaled, false, null
     else
-      yield gorilla.run code, options
+      gorilla.run code, options
       ""
     if result != ""
       process.stdout.write result
@@ -183,17 +188,17 @@ let main = promise!
     options.noindent := true
   
   if argv.eval?
-    return yield handle-code String(argv.eval)
+    return handle-code String(argv.eval)
   
   if argv.stdin
-    let code = yield read-stdin()
-    return yield handle-code String(code)
+    let code = read-stdin()
+    return handle-code String(code)
   
   if not filenames.length
     throw Error "Expected at least one filename by this point"
   
   if not argv.compile
-    let input = yield to-promise! fs.read-file filenames[0]
+    let input = fs.read-file-sync filenames[0]
 
     options.filename := filenames[0]
     let new-argv = ["gorilla"]
@@ -202,7 +207,7 @@ let main = promise!
         new-argv.push ...process.argv[i to -1]
         break
     process.argv := new-argv
-    return yield handle-code String input
+    return handle-code String(input)
   
   if argv.map
     options.source-map := {
@@ -226,7 +231,7 @@ let main = promise!
       path.basename filename
     process.stdout.write "Compiling $(base-filenames.join ', ') ... "
     let compile-time = timer!
-      yield gorilla.compile-file {} <<< options <<< {
+      gorilla.compile-file {} <<< options <<< {
         input: filenames
         output: argv.output
       }
@@ -235,7 +240,7 @@ let main = promise!
     for filename in filenames
       process.stdout.write "Compiling $(path.basename filename) ... "
       let compile-time = timer!
-        yield gorilla.compile-file {} <<< options <<< {
+        gorilla.compile-file {} <<< options <<< {
           input: filename
           output: get-js-output-path filename
         }
@@ -261,7 +266,7 @@ let main = promise!
             try
               process.stdout.write "Compiling $(path.basename best-name) ... "
               let compile-time = timer!
-                yield gorilla.compile-file {} <<< options <<< {
+                gorilla.compile-file {} <<< options <<< {
                   input: best-name
                   output: get-js-output-path best-name
                 }
@@ -283,7 +288,8 @@ let main = promise!
       watch-file filename
     set-interval handle-queue, 17
     console.log "Watching $(filenames.join ', ')..."
-
-main.then null, #(e)
+try
+  main()
+catch e
   console.error e?.stack or e
   process.exit(1)
