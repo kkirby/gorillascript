@@ -3674,8 +3674,7 @@ else
 			set-timeout(func, 0)
 
 macro helper __generator-to-promise = #(func)
-	#()
-		let iter = func.apply(this,arguments)
+	let res = #(iter)
 		new Promise #(fulfill,reject)
 			let next(result,handler = \next)
 				let info = try; iter[handler](result)
@@ -3688,6 +3687,8 @@ macro helper __generator-to-promise = #(func)
 					)
 				else; next info.value
 			next()
+	if typeof func != \function and func.next?; res func
+	else; # -> res func.apply(@,arguments)
 
 macro promise!
 	syntax node as Expression
@@ -3833,8 +3834,19 @@ macro some-promise!(node)
 	
 	ASTE __some-promise $node
 
-macro helper __every-promise = #(promises as {})
-	Promise.all promises
+macro helper __every-promise = #(promises)
+	if promises instanceof Array; Promise.all promises
+	else
+		let keys = []
+		let values = []
+		for key, value of promises
+			keys.push key
+			values.push value
+		Promise.all(values).then #(resValues)
+			let res = {}
+			for value, index in resValues; res[keys[index]] := value
+			res
+    
 
 macro every-promise!(node)
 	if macro-data.length > 1
@@ -4037,11 +4049,11 @@ macro promisefor
 	syntax "(", parallelism as Expression, ")", value as Identifier, index as (",", this as Identifier)?, "from", iterator, body as GeneratorBody
 		
 		let func = if index
-			ASTE(body) #($value, $index)* -> $body
+			ASTE(body) #($value, $index)** -> $body
 		else
-			ASTE(body) #($value)* -> $body
+			ASTE(body) #($value)** -> $body
 
-		ASTE __promise-iter +$parallelism, __iter($iterator), __promise $func
+		ASTE __promise-iter +$parallelism, __iter($iterator), $func
 
 macro __LINE__
 	syntax "" with type: \number
