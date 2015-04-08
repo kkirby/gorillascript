@@ -121,7 +121,7 @@ describe "Triple-double-quoted strings", #
     I am well today.
     """).to.equal "Hello, friend!\nI am well today."
     
-    expect(gorilla.eval-sync '"""alpha\r\nbravo"""').to.equal "alpha\nbravo"
+    expect(gorilla.eval '"""alpha\r\nbravo"""').to.equal "alpha\nbravo"
   
   it "only ignores one line of whitespace on start and end", #
     expect("""
@@ -208,7 +208,7 @@ describe "Triple-single-quoted strings", #
     I am well today.
     ''').to.equal "Hello, friend!\nI am well today."
 
-    expect(gorilla.eval-sync "'''alpha\r\nbravo'''").to.equal "alpha\nbravo"
+    expect(gorilla.eval "'''alpha\r\nbravo'''").to.equal "alpha\nbravo"
   
   it "only ignores one line of whitespace on start and end", #
     expect('''
@@ -310,7 +310,7 @@ describe "Escape codes", #
     expect("\u{00ffff}").to.have.length 1
     expect("\u{010000}").to.have.length 2
     expect("\u{10ffff}").to.have.length 2
-    expect(#-> gorilla.compile-sync('''let x = 0
+    expect(#-> gorilla.compile('''let x = 0
     let y = "\\u{110000}"''')).throws(gorilla.ParserError, r"Unicode escape sequence too large.*?\b2:\d+")
     expect("\u{20bb7}").to.have.length 2
     expect("\u{20bb7}").to.equal "\ud842\udfb7"

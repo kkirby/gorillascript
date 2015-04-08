@@ -14,7 +14,7 @@ describe "consts", #
   
   it "converts directly to constant value", #
     let make-code(debug-value)
-      gorilla.compile-sync("""
+      gorilla.compile("""
       const DEBUG = $debug-value
     
       if DEBUG
@@ -75,7 +75,7 @@ describe "object consts", #
   
   it "converts directly to a constant value when accessing a const object's key", #
     let make-code(key)
-      gorilla.compile-sync("""
+      gorilla.compile("""
       const VALUES = { alpha: 1, bravo: 2, charlie: 3 }
       
       let value = VALUES.$key
@@ -94,7 +94,7 @@ describe "array consts", #
   
   it "converts directly to a constant value when accessing a const array's key", #
     let make-code(key)
-      gorilla.compile-sync("""
+      gorilla.compile("""
       const VALUES = ["alpha", "bravo", "charlie"]
       
       let value = VALUES.$key

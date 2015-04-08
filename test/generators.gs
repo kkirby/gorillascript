@@ -7,10 +7,7 @@ let to-array(iterator, values = [])
   values.push void
   let arr = []
   while true
-    let item = if iterator.send
-      iterator.send values.pop()
-    else
-      iterator.next()
+    let item = iterator.next(values.pop())
     if item.done
       if item.value?
         return { arr, item.value }
@@ -475,13 +472,13 @@ describe "yield as throw expression", #
 
     let generator = fun()
     expect(order.list).to.eql []
-    expect(generator.send(void)).to.eql { -done, \value }
+    expect(generator.next(void)).to.eql { -done, \value }
     expect(order.list).to.eql [\value]
     let obj = Error()
-    expect(#-> generator.send(obj)).throws(obj)
+    expect(#-> generator.next(obj)).throws(obj)
     expect(order.list).to.eql [\value]
     for i in 0 til 10
-      expect(generator.send(void)).to.eql { +done, value: void }
+      expect(generator.next(void)).to.eql { +done, value: void }
 
 describe "yield in call statement", #
   it "yields expected items", #
@@ -852,9 +849,9 @@ describe "auto-return", #
       yield \bravo
     
     let mutable iter = fun()
-    expect(iter.send void).to.eql { -done, value: \alpha }
-    expect(iter.send void).to.eql { -done, value: \bravo }
-    expect(iter.send \charlie).to.eql { +done, value: \charlie }
+    expect(iter.next void).to.eql { -done, value: \alpha }
+    expect(iter.next void).to.eql { -done, value: \bravo }
+    expect(iter.next \charlie).to.eql { +done, value: \charlie }
 
 describe "yield with an uncaught error returns that it's done after error", #
   let fun(obj)*
@@ -973,7 +970,7 @@ describe "yield without a value", #
     expect(middle).to.be.called
 
     expect(finish).to.not.be.called
-    expect(iter.send("hello")).to.be.eql { +done, value: "hello" }
+    expect(iter.next("hello")).to.be.eql { +done, value: "hello" }
     
     expect(start).to.be.called-once
     expect(middle).to.be.called-once
@@ -1046,8 +1043,8 @@ describe "yield within a spread", #
       f ...(yield \alpha)
     
     let iter = fun()
-    expect(iter.send(void)).to.eql { -done, value: \alpha }
-    expect(iter.send([\bravo, \charlie])).to.eql { +done, value: void }
+    expect(iter.next(void)).to.eql { -done, value: \alpha }
+    expect(iter.next([\bravo, \charlie])).to.eql { +done, value: void }
     expect(f).to.be.called-once
   
   it "as the return statement", #
@@ -1056,13 +1053,13 @@ describe "yield within a spread", #
       f ...(yield \alpha)
     
     let iter = fun()
-    expect(iter.send(void)).to.eql { -done, value: \alpha }
-    expect(iter.send([\bravo, \charlie])).to.eql { +done, value: \delta }
+    expect(iter.next(void)).to.eql { -done, value: \alpha }
+    expect(iter.next([\bravo, \charlie])).to.eql { +done, value: \delta }
     expect(f).to.be.called-once
 
 describe "function declaration hoisting", #
   it "hoists function declarations to the generator's scope rather than inside the send method", #
-    expect(gorilla.compile-sync("""
+    expect(gorilla.compile("""
     let generator()!*
       let my-func()
         "hello"

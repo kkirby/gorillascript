@@ -3297,49 +3297,13 @@ macro yield
 	syntax node as Expression?
 		if not @in-generator
 			@error "Can only use yield in a generator function"
-		@mutate-last node, (#(subnode) -> @internal-call \yield, subnode), true
+		@mutate-last node, (#(subnode) -> @internal-call \yield, subnode, @const(false)), true
 
 macro yield*
-	syntax node as Expression
+	syntax node as Expression?
 		if not @in-generator
-			@error "Can only use yield* in a generator function"
-		let init = []
-		if @is-type node, \array-like
-			let index = @tmp \i, false
-			init.push AST let $index = 0
-			let length = @tmp \len, false
-			node := @cache node, init, \arr, false
-			init.push AST let $length as Number = $node.length
-			AST
-				for $init; $index ~< $length; $index ~+= 1
-					yield $node[$index]
-				void
-		else
-			let iterator = @cache ASTE __iter($node), init, \iter, false
-			let err = @tmp \e, true
-			let send = @tmp \send
-			let item = @tmp \item
-			let received = @tmp \tmp
-			AST
-				$init
-				let mutable $received = void
-				let mutable $send = true
-				
-				while true
-					let $item = if $send then $iterator.send($received) else $iterator.throw($received)
-					if $item.done
-						break
-					try
-						$received := yield $item.value
-						$send := true
-					catch $err
-						$received := $err
-						$send := false
-				try
-					$iterator.close()
-				catch $err
-					void
-				$item.value
+			@error "Can only use yield in a generator function"
+		@mutate-last node, (#(subnode) -> @internal-call \yield, subnode, @const(true)), true
 
 macro returning
 	syntax node as Expression, rest as DedentedBody
@@ -3710,21 +3674,21 @@ else
 			set-timeout(func, 0)
 
 macro helper __generator-to-promise = #(func)
-	#()
-		let iter = func.apply(this,arguments)
+	let res = #(iter)
 		new Promise #(fulfill,reject)
-			let next(result)
-				let info = try; iter.next(result)
+			let next(result,handler = \next)
+				let info = try; iter[handler](result)
 				catch e; return reject e
 				if info.done; fulfill info.value
 				else if info.value instanceof Promise
 					info.value.then(
 						#(result) -> next(result)
-						#(e)
-							try; iter.throw e
-							catch e; reject e
+						#(e) -> next e, \throw
 					)
+				else; next info.value
 			next()
+	if typeof func != \function and func.next?; res func
+	else; # -> res func.apply(@,arguments)
 
 macro promise!
 	syntax node as Expression
@@ -3870,8 +3834,19 @@ macro some-promise!(node)
 	
 	ASTE __some-promise $node
 
-macro helper __every-promise = #(promises as {})
-	Promise.all promises
+macro helper __every-promise = #(promises)
+	if promises instanceof Array; Promise.all promises
+	else
+		let keys = []
+		let values = []
+		for key, value of promises
+			keys.push key
+			values.push value
+		Promise.all(values).then #(resValues)
+			let res = {}
+			for value, index in resValues; res[keys[index]] := value
+			res
+    
 
 macro every-promise!(node)
 	if macro-data.length > 1
@@ -3938,40 +3913,39 @@ macro helper __promise-iter = #(mutable limit as Number, iterator as {next: Func
 	let result = []
 	let mutable done = false
 	let mutable slots-used = 0
-	let {reject, fulfill, promise} = __defer()
-	let mutable index = 0
-	let mutable iter-stopped = false
-	let handle(item, index)
-		slots-used += 1
-		body(item, index).then(
-			#(value)
-				result[index] := value
-				slots-used -= 1
-				flush()
-			#(reason)
-				done := true
-				reject reason)
-	let flush()
-		while not done and not iter-stopped and slots-used < limit
-			let mutable item = void
-			try
-				item := iterator.next()
-			catch e
-				done := true
-				reject e
-				return
+	new Promise #(fulfill,reject)
+  	let mutable index = 0
+  	let mutable iter-stopped = false
+  	let handle(item, index)
+  		slots-used += 1
+  		body(item, index).then(
+  			#(value)
+  				result[index] := value
+  				slots-used -= 1
+  				flush()
+  			#(reason)
+  				done := true
+  				reject reason)
+  	let flush()
+  		while not done and not iter-stopped and slots-used < limit
+  			let mutable item = void
+  			try
+  				item := iterator.next()
+  			catch e
+  				done := true
+  				reject e
+  				return
 			
-			if item.done
-				iter-stopped := true
-				break
+  			if item.done
+  				iter-stopped := true
+  				break
 			
-			handle(item.value, post-inc! index)
+  			handle(item.value, post-inc! index)
 		
-		if not done and slots-used == 0 and iter-stopped
-			done := true
-			fulfill result
-	set-immediate flush
-	promise
+  		if not done and slots-used == 0 and iter-stopped
+  			done := true
+  			fulfill result
+  	set-immediate flush
 
 macro promisefor
 	syntax "(", parallelism as Expression, ")", value as Declarable, index as (",", value as Identifier, length as (",", this as Identifier)?)?, "in", array, body as GeneratorBody
@@ -4075,11 +4049,11 @@ macro promisefor
 	syntax "(", parallelism as Expression, ")", value as Identifier, index as (",", this as Identifier)?, "from", iterator, body as GeneratorBody
 		
 		let func = if index
-			ASTE(body) #($value, $index)* -> $body
+			ASTE(body) #($value, $index)** -> $body
 		else
-			ASTE(body) #($value)* -> $body
+			ASTE(body) #($value)** -> $body
 
-		ASTE __promise-iter +$parallelism, __iter($iterator), __promise $func
+		ASTE __promise-iter +$parallelism, __iter($iterator), $func
 
 macro __LINE__
 	syntax "" with type: \number

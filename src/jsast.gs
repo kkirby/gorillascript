@@ -2272,11 +2272,16 @@ exports.Throw := class Throw extends Statement
   @from-JSON := #(line, column, file, ...node) -> Throw make-pos(line, column, file), from-JSON(node)
 
 exports.Yield := class Yield extends Expression
-  def constructor(@pos as {}, @node as Expression) ->
+  def constructor(@pos as {}, @node as Expression,@passThru) ->
 
   def compile(options, level, line-start, sb)!
-    sb "yield "
+    if level > 2; sb "("
+    sb "yield"
+    if @passThru
+      sb "*"
+    sb " "
     @node.compile options, Level.inside-parentheses, false, sb
+    if level > 2; sb ")"
 
   def compile-as-block(options, level, line-start, sb)!
     Noop(@pos).compile-as-block(options, level, line-start, sb)
@@ -2284,15 +2289,15 @@ exports.Yield := class Yield extends Expression
   def walk(walker)
       let node = walker(@node, this, \node) ? @node.walk(walker)
       if node != @node
-        Yield @pos, node
+        Yield @pos, node, @passThru
       else
         this
 
   def type-id = AstType.Yield
-  def _to-ast(pos, ident) -> [@node.to-ast(pos, ident)]
-  @_from-ast := #(pos, node) -> Yield pos, node
-  def _to-JSON() -> @node.to-JSON()
-  @from-JSON := #(line, column, file, source, ...node) -> Yield make-pos(line, column, file), from-JSON(node)
+  def _to-ast(pos, ident) -> [@node.to-ast(pos, ident),Const(pos,@passThru)]
+  @_from-ast := #(pos, node, passThru) -> Yield pos, node, passThru
+  def _to-JSON() -> @node.to-JSON().concat(@passThru)
+  @from-JSON := #(line, column, file, source, ...node,passThru) -> Yield make-pos(line, column, file), from-JSON(node), passThru
 
 
 exports.Switch := class Switch extends Statement

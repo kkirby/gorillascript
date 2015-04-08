@@ -4,7 +4,7 @@ let gorilla = require '../index'
 
 describe "embedded compilation", #
   it "works with simple text and calculated value", #
-    let f = gorilla.eval-sync """
+    let f = gorilla.eval """
     Hello, <%= "wor" & "ld" %>!
     """, embedded: true, noindent: true
     let text = []
@@ -12,7 +12,7 @@ describe "embedded compilation", #
     expect(text.join "").to.equal "Hello, world!"
   
   it "allows for access from the context", #
-    let f = gorilla.eval-sync """
+    let f = gorilla.eval """
     Hello, <%= name %>!
     """, embedded: true, noindent: true
     let text = []
@@ -20,7 +20,7 @@ describe "embedded compilation", #
     expect(text.join "").to.equal "Hello, world!"
   
   it "allows for a function call from a context helper", #
-    let f = gorilla.eval-sync """
+    let f = gorilla.eval """
     Hello, <%= get-name() %>!
     """, embedded: true, noindent: true
     let text = []
@@ -28,7 +28,7 @@ describe "embedded compilation", #
     expect(text.join "").to.equal "Hello, world!"
   
   it "allows if statements", #
-    let f = gorilla.eval-sync """
+    let f = gorilla.eval """
     <% if name: %>
     Hello, <%= name %>!
     <% end %>
@@ -43,7 +43,7 @@ describe "embedded compilation", #
     expect(text.join("").trim()).to.equal ""
   
   it "allows if-else statements", #
-    let f = gorilla.eval-sync """
+    let f = gorilla.eval """
     <% if name: %>
     Hello, <%= name %>!
     <% else: %>
@@ -60,7 +60,7 @@ describe "embedded compilation", #
     expect(text.join("").trim()).to.equal "Hello!"
   
   it "allows for loops", #
-    let f = gorilla.eval-sync """
+    let f = gorilla.eval """
     <% for item in items: %>
     <%= item.name %>: \$<%= item.price.to-fixed(2) %>
     <% end %>
@@ -81,7 +81,7 @@ describe "embedded compilation", #
       '''
   
   it "allows custom escaping", #
-    let template = gorilla.eval-sync """
+    let template = gorilla.eval """
     Hello, <%= name %>
     """, embedded: true, noindent: true
 
@@ -97,7 +97,7 @@ describe "embedded compilation", #
     expect(text.join "").to.equal "Hello, BOB"
   
   it "allows calling async helpers", #(cb)
-    let template = gorilla.eval-sync """
+    let template = gorilla.eval """
     <% async <- soon() %>
     Hello, <%= name %>!
     <% done() %>
@@ -115,7 +115,7 @@ describe "embedded compilation", #
     }
   
   it "allows calling an async helper in a block", #(cb)
-    let template = gorilla.eval-sync """
+    let template = gorilla.eval """
     <% do: %>
       <% async <- soon() %>
       Hello, <%= name %>!
@@ -135,7 +135,7 @@ describe "embedded compilation", #
     }
   
   it "allows comments", #
-    let template = gorilla.eval-sync """
+    let template = gorilla.eval """
     <%-- ignore() --%>
     Hello<%-- this isn't even correct syntax. --%>, world!
     <% /* these comments should work, too */ %>
@@ -146,7 +146,7 @@ describe "embedded compilation", #
     expect(text.join("").trim()).equal "Hello, world!"
   
   it "allows non-standard tokens", #
-    let template = gorilla.eval-sync """
+    let template = gorilla.eval """
       {* ignore() *}
       Hello{* ignore() *}, world!
       {% if test: %}
@@ -177,7 +177,7 @@ describe "embedded compilation", #
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello, world! Fail {{ name }}"
   
   it "allows generators with yield statements", #
-    let template = gorilla.eval-sync """
+    let template = gorilla.eval """
     <% let f()*: %>
       [ <% yield "Alpha" %> ]
       [ <% yield "Bravo" %> ]
@@ -195,7 +195,7 @@ describe "embedded compilation", #
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "[ ALPHA ] [ BRAVO ]"
   
   it "allows generators with yield expressions", #
-    let template = gorilla.eval-sync """
+    let template = gorilla.eval """
     <% let f()*: %>
       [ <%= yield "Alpha" %> ]
       [ <%= yield "Bravo" %> ]
@@ -203,7 +203,7 @@ describe "embedded compilation", #
     <% let iter = f()
        let mutable next-value = void
        while true:
-         let item = iter.send(next-value)
+         let item = iter.next(next-value)
          if item.done:
            break
          end %>
@@ -220,7 +220,7 @@ describe "embedded compilation", #
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "[ ALPHA alpha ] [ BRAVO bravo ]"
 
   it "as a generator, should allow yield in the main body", #
-    let template = gorilla.eval-sync """
+    let template = gorilla.eval """
     Hello, <%= yield "name" %>. How are you today?
     """, embedded: true, noindent: true, embedded-generator: true
     
@@ -229,22 +229,20 @@ describe "embedded compilation", #
       text.push String x
     
     let iter = template write, {}
-    expect(iter).to.have.property(\iterator).that.is.a \function
     expect(iter).to.have.property(\next).that.is.a \function
-    expect(iter).to.have.property(\send).that.is.a \function
     expect(iter).to.have.property(\throw).that.is.a \function
     expect(text).to.be.empty
     
-    expect(iter.send void).to.eql { -done, value: "name" }
+    expect(iter.next void).to.eql { -done, value: "name" }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello,"
-    expect(iter.send "world").to.eql { +done, value: write }
+    expect(iter.next "world").to.eql { +done, value: write }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello, world. How are you today?"
     for i in 0 til 10
-      expect(iter.send void).to.eql { +done, value: void }
+      expect(iter.next void).to.eql { +done, value: void }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello, world. How are you today?"
 
   it "as a generator, should allow yield* in the main body", #
-    let template = gorilla.eval-sync """
+    let template = gorilla.eval """
     <% let generator()*:
          yield "hello"
          yield "there"
@@ -257,24 +255,22 @@ describe "embedded compilation", #
       text.push String x
     
     let iter = template write, {}
-    expect(iter).to.have.property(\iterator).that.is.a \function
     expect(iter).to.have.property(\next).that.is.a \function
-    expect(iter).to.have.property(\send).that.is.a \function
     expect(iter).to.have.property(\throw).that.is.a \function
     expect(text).to.be.empty
     
-    expect(iter.send void).to.eql { -done, value: "hello" }
+    expect(iter.next void).to.eql { -done, value: "hello" }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello,"
-    expect(iter.send void).to.eql { -done, value: "there" }
+    expect(iter.next void).to.eql { -done, value: "there" }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello,"
-    expect(iter.send "world").to.eql { +done, value: write }
+    expect(iter.next "world").to.eql { +done, value: write }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello, world. How are you today?"
     for i in 0 til 10
-      expect(iter.send void).to.eql { +done, value: void }
+      expect(iter.next void).to.eql { +done, value: void }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello, world. How are you today?"
 
   it "should allow a for loop within an embed write", #
-    let template = gorilla.eval-sync """
+    let template = gorilla.eval """
     Hello, <%= for x in [1, 2, 3]:
       x
     end %>. How are you today?
@@ -285,20 +281,18 @@ describe "embedded compilation", #
       text.push String x
     
     let iter = template write, {}
-    expect(iter).to.have.property(\iterator).that.is.a \function
     expect(iter).to.have.property(\next).that.is.a \function
-    expect(iter).to.have.property(\send).that.is.a \function
     expect(iter).to.have.property(\throw).that.is.a \function
     expect(text).to.be.empty
     
-    expect(iter.send void).to.eql { +done, value: write }
+    expect(iter.next void).to.eql { +done, value: write }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello, 1,2,3. How are you today?"
     for i in 0 til 10
-      expect(iter.send void).to.eql { +done, value: void }
+      expect(iter.next void).to.eql { +done, value: void }
     expect(text.join("").trim().replace(r"\s+"g, " ")).to.equal "Hello, 1,2,3. How are you today?"
   
   it "allows literal segments", #
-    let f = gorilla.eval-sync """
+    let f = gorilla.eval """
     Hello, <%@<%= "wor" & "ld" %>@%>!
     """, embedded: true, noindent: true
     let text = []

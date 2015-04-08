@@ -4854,7 +4854,7 @@ let _Block-mutator(lines, parser, index)
   default
     LInternalCall \block, index, parser.scope.peek(), nodes
 
-let RootInnerP = promise! #(parser, index)*
+let RootInner = #(parser, index)
   parser.clear-cache()
   let head = Line parser, index
   if not head
@@ -4863,8 +4863,6 @@ let RootInnerP = promise! #(parser, index)*
   let mutable current-index = head.index
   while true
     parser.clear-cache()
-    unless parser.options.sync
-      yield fulfilled! void
     let separator = SomeEmptyLines parser, current-index
     if not separator
       break
@@ -4896,13 +4894,11 @@ let EmbeddedBlock = sequential(
 
 let EmbeddedLiteralTextInnerPartWithBlock = one-of(EmbeddedLiteralTextInnerPart, EmbeddedBlock)
 
-let EmbeddedRootInnerP = promise! #(parser, index)*
+let EmbeddedRootInner = #(parser, index)
   let nodes = []
   let mutable current-index = index
   while true
     parser.clear-cache()
-    unless parser.options.sync
-      yield fulfilled! void
     let item = EmbeddedLiteralTextInnerPartWithBlock parser, current-index
     if not item
       break
@@ -4984,7 +4980,7 @@ let Imports = maybe separated-list(
     x.const-value()
   SomeEmptyLines), # []
 
-let RootP = promise! #(parser as Parser)*
+let Root = #(parser as Parser)
   let bom = BOM parser, 0
   let shebang = Shebang parser, bom.index
   let mutable empty = EmptyLines parser, shebang.index
@@ -5000,15 +4996,11 @@ let RootP = promise! #(parser as Parser)*
       LValue empty.index, false
   for import-file in imports.value
     parser.clear-cache()
-    if parser.options.sync
-      parser.import-sync import-file, imports.index
-    else
-      yield parser.import import-file, imports.index
+    parser.import import-file, imports.index
   parser.clear-cache()
-  let root = if parser.options.sync then RootInnerP.sync parser, empty.index else yield RootInnerP parser, empty.index
+  let root = RootInner parser, empty.index
   parser.clear-cache()
-  if not root
-    return
+  if not root; return
   let empty-again = EmptyLines parser, root.index
   let end-space = Space parser, empty-again.index
   parser.clear-cache()
@@ -5018,23 +5010,22 @@ let RootP = promise! #(parser as Parser)*
     LValue empty.index, false
     LValue empty.index, false
 
-let EmbeddedRootP = promise! #(parser as Parser)*
+let EmbeddedRoot = #(parser as Parser)
   let bom = BOM parser, 0
   let shebang = Shebang parser, bom.index
   parser.clear-cache()
-  let root = if parser.options.sync then EmbeddedRootInnerP.sync parser, shebang.index else yield EmbeddedRootInnerP parser, shebang.index
+  let root = EmbeddedRootInner parser, shebang.index
   parser.clear-cache()
-  if not root
-    return
+  if not root; return
   return Box root.index, LInternalCall \root, shebang.index, parser.scope.peek(),
     LValue shebang.index, parser.options.filename or null
     root.value
     LValue shebang.index, true
     LValue shebang.index, parser.in-generator.peek()
 
-let EmbeddedRootGeneratorP = promise! #(parser as Parser)*
+let EmbeddedRootGenerator = #(parser as Parser)
   parser.in-generator.push true
-  let result = if parser.options.sync then EmbeddedRootP.sync parser else yield EmbeddedRootP parser
+  let result = EmbeddedRoot parser
   parser.in-generator.pop()
   return result
 
@@ -5214,7 +5205,7 @@ class Parser
     
     ParserError "Expected $(build-expected @failure-messages), but $last-token found", this, index
   
-  def import = promise! #(filename as String, index as Number)!*
+  def import = #(filename as String, index as Number)!
     require! fs
     require! path
     if not is-string! @options.filename
@@ -5222,27 +5213,14 @@ class Parser
     
     let full-filename = path.resolve path.dirname(@options.filename), filename
     
-    let source = if @options.sync
-      fs.read-file-sync full-filename, "utf8"
-    else
-      yield to-promise! fs.read-file full-filename, "utf8"
-    
+    let source = fs.read-file-sync full-filename, "utf8"
     let parse-options = {
       filename: full-filename
       noindent: @options.noindent
-      sync: @options.sync
     }
     
-    let result = if @options.sync
-      parse.sync(source, @macros, parse-options)
-    else
-      yield parse(source, @macros, parse-options)
+    let result = parse(source, @macros, parse-options)
     @macros := result.macros
-  
-  def import-sync(filename as String, index as Number)
-    if not @options.sync
-      throw Error "Expected options.sync to be true"
-    @import.sync@ this, filename, index
   
   def push-scope(is-top as Boolean, parent as Scope|null)
     let scope = (parent or @scope.peek()).clone(is-top)
@@ -6183,24 +6161,21 @@ class Parser
   
   def clear-cache()! -> @cache := []
 
-let parse = promise! #(source as String, mutable macros as MacroHolder|null, options as {} = {})*
+let parse = #(source as String, mutable macros as MacroHolder|null, options as {} = {})
   let mutable parser = Parser source, macros?.clone(), options
   macros := parser.macros
   
-  let root-rule = if options.embedded-generator
-    EmbeddedRootGeneratorP
-  else if options.embedded
-    EmbeddedRootP
-  else
-    RootP
+  let root-rule = if options.embedded-generator; EmbeddedRootGenerator
+  else if options.embedded; EmbeddedRoot
+  else; Root
 
   let start-time = new Date().get-time()
   let mutable result = void
   try
-    result := if options.sync then root-rule.sync(parser) else yield root-rule parser
+    result := root-rule parser
   catch e == SHORT_CIRCUIT
     void
-
+  
   parser.clear-cache()
   let end-parse-time = new Date().get-time()
   options.progress?(\parse, end-parse-time - start-time)
@@ -6208,7 +6183,7 @@ let parse = promise! #(source as String, mutable macros as MacroHolder|null, opt
   if not result or result.index < source.length
     throw parser.get-failure(result?.index)
 
-  let expanded = yield parser.macro-expand-all-promise result.value
+  let expanded = parser.macro-expand-all result.value
 
   let end-expand-time = new Date().get-time()
   options.progress?(\macro-expand, end-expand-time - end-parse-time)
