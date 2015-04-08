@@ -29,7 +29,6 @@
     "optimist": "~0.5.0"
   },
   "devDependencies": {
-    "promises-aplus-tests": "*",
     "mocha": "~1.9.0",
     "chai": "~1.6.0",
     "sinon": "~1.7.2",
