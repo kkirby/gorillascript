@@ -1187,6 +1187,18 @@ else
 		F.prototype := x
 		new F()
 
+macro yield
+	syntax node as Expression?
+		if not @in-generator
+			@error "Can only use yield in a generator function"
+		@mutate-last node, (#(subnode) -> @internal-call \yield, subnode, @const(false)), true
+
+macro yield*
+	syntax node as Expression?
+		if not @in-generator
+			@error "Can only use yield in a generator function"
+		@mutate-last node, (#(subnode) -> @internal-call \yield, subnode, @const(true)), true
+
 macro for
 	syntax reducer as (\every | \some | \first)?, init as (ExpressionOrAssignment|""), ";", test as (Logic|""), ";", step as (ExpressionOrAssignment|""), body as (BodyNoEnd | (";", this as Statement)), else-body as ("\n", "else", this as (BodyNoEnd | (";", this as Statement)))?, "end"
 		init ?= @noop()
@@ -1656,17 +1668,49 @@ macro for
 				]
 	
 		if @has-func(body)
+			let breakVar = @tmp \break, true
+			let continueVar = @tmp \continue, true
+			let mutable hasContinue = false
+			let mutable hasBreak = false
+			body := body.walk #(item)
+				if item.isMacroAccess
+					if item.data.macroName == \for; return item
+					if item.data.macroName == \continue
+						hasContinue := true
+						ASTE return $continueVar
+					else if item.data.macroName == \break
+						hasBreak := true
+						ASTE return $breakVar
+				else; item
 			let func = @tmp \f, false
 			if value and value-ident != value.ident
 				body := AST(body)
 					let $value = $value-ident
 					$body
+			let mutable _func = null
 			if has-index
-				init.push AST(body) let $func = #($value-ident, $index) -> $body
+				_func := ASTE #($value-ident, $index) -> $body
 				body := ASTE(body) $func@(this, $value-expr, $index)
 			else
-				init.push AST(body) let $func = #($value-ident) -> $body
+				_func := ASTE #($value-ident) -> $body
 				body := ASTE(body) $func@(this, $value-expr)
+			_func.args[* - 1] := @const @inGenerator
+			if @inGenerator; body := ASTE yield $body
+			init.push ASTE let $func = $_func
+			if hasBreak or hasContinue
+				let result = @tmp \result, false
+				body := ASTE let $result = $body
+				if hasBreak
+					body := AST
+						$body
+						if $result == $breakVar; break
+				if hasContinue
+					body := AST
+						$body
+						if $result == $continueVar; continue
+			if hasContinue; init.push AST let $continueVar = # ->
+			if hasBreak; init.push AST let $breakVar = # ->
+			
 		else if value-ident == value.ident or reducer != \filter
 			body := AST(body)
 				let $value = $value-expr
@@ -1744,21 +1788,52 @@ macro for
 		let let-value = value and @macro-expand-all AST(value) let $value = $object[$key]
 		let let-index = index and @macro-expand-all AST(index) let mutable $index = -1
 		if @has-func(body)
+			let breakVar = @tmp \break, true
+			let continueVar = @tmp \continue, true
+			let mutable hasContinue = false
+			let mutable hasBreak = false
+			body := body.walk #(item)
+				if item.isMacroAccess
+					if item.data.macroName == \for; return item
+					if item.data.macroName == \continue
+						hasContinue := true
+						ASTE return $continueVar
+					else if item.data.macroName == \break
+						hasBreak := true
+						ASTE return $breakVar
+				else; item
 			let func = @tmp \f, false
 			let value-ident = if value then (if value.type == \ident then value.ident else @tmp \v, false)
 			if value and value-ident != value.ident
 				body := AST(body)
 					let $value = $value-ident
 					$body
+			let mutable _func = null
 			if index
-				init.push (AST(body) let $func = #($key, $value-ident, $index) -> $body)
+				_func := ASTE #($key, $value-ident, $index) -> $body
 				body := (ASTE(body) $func@(this, $key, $object[$key], $index))
 			else if value
-				init.push (AST(body) let $func = #($key, $value-ident) -> $body)
+				_func := ASTE #($key, $value-ident) -> $body
 				body := (ASTE(body) $func@(this, $key, $object[$key]))
 			else
-				init.push (AST(body) let $func = #($key) -> $body)
+				_func := ASTE #($key) -> $body
 				body := (ASTE(body) $func@(this, $key))
+			_func.args[* - 1] := @const @inGenerator
+			if @inGenerator; body := ASTE yield $body
+			init.push ASTE let $func = $_func
+			if hasBreak or hasContinue
+				let result = @tmp \result, false
+				body := ASTE let $result = $body
+				if hasBreak
+					body := AST
+						$body
+						if $result == $breakVar; break
+				if hasContinue
+					body := AST
+						$body
+						if $result == $continueVar; continue
+			if hasContinue; init.push AST let $continueVar = # ->
+			if hasBreak; init.push AST let $breakVar = # ->
 		else if value
 			body := AST(body)
 				$let-value
@@ -3292,18 +3367,6 @@ macro class
 			ASTE $assignment := $result
 		else
 			result
-
-macro yield
-	syntax node as Expression?
-		if not @in-generator
-			@error "Can only use yield in a generator function"
-		@mutate-last node, (#(subnode) -> @internal-call \yield, subnode, @const(false)), true
-
-macro yield*
-	syntax node as Expression?
-		if not @in-generator
-			@error "Can only use yield in a generator function"
-		@mutate-last node, (#(subnode) -> @internal-call \yield, subnode, @const(true)), true
 
 macro returning
 	syntax node as Expression, rest as DedentedBody
