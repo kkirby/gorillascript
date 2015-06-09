@@ -214,7 +214,7 @@
           ]);
           parts.push("require['./" + __strnum(file) + "'] = function () {\n  var module = { exports: this };\n  var exports = this;\n  " + __strnum(text.split("\n").join("\n  ")) + "\n  return module.exports;\n};");
         }
-        gorilla = require("lib/gorilla");
+        gorilla = require("./lib/gorilla.js");
         serializedPrelude = yield gorilla.getSerializedPrelude();
         code = ';(function (root) {\n  "use strict";\n  var GorillaScript = (function (realRequire) {\n    function require(path) {\n      var has = Object.prototype.hasOwnProperty;\n      if (has.call(require._cache, path)) {\n        return require._cache[path];\n      } else if (has.call(require, path)) {\n        var func = require[path];\n        delete require[path];\n        return require._cache[path] = func.call({});\n      } else if (realRequire) {\n        return realRequire(path);\n      }\n    }\n    require._cache = {};\n    ' + parts.join("\n").split("\n").join("\n    ") + '\n\n    require("./browser");\n    return require("./gorilla").withPrelude(' + __strnum(serializedPrelude.split("\n").join("\n    ")) + ');\n  }(typeof module !== "undefined" && typeof require === "function" ? require : void 0));\n\n  if (typeof define === "function" && define.amd) {\n    define(function () { return GorillaScript; });\n  } else {\n    root.GorillaScript = GorillaScript;\n  }\n}(this));';
         grunt.file.write("extras/gorillascript.js", code);
