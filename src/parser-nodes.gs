@@ -2702,7 +2702,7 @@ let InternalCall(internal-name, index, scope, ...args)
     ...args
 
 class MacroAccess extends Node
-  def constructor(@index as Number, @scope, @id as Number, @data as {}, @in-statement as Boolean, @in-generator as Boolean, @in-evil-ast as Boolean, @do-wrapped as Boolean) ->
+  def constructor(@index as Number, @scope, @id as Number, @data as {}, @in-statement as Boolean, @in-generator as Boolean, @in-promise as Boolean, @in-evil-ast as Boolean, @do-wrapped as Boolean) ->
 
   def is-macro-access = true
   def node-type = \macro-access
@@ -2719,7 +2719,7 @@ class MacroAccess extends Node
     sb.push "\n  data: "
     let {inspect} = require('util')
     sb.push inspect(@data, null, depth-1).split("\n").join("\n  ")
-    for key in [\in-statement, \in-generator, \in-evil-ast, \do-wrapped]
+    for key in [\in-statement, \in-generator, \in-promise, \in-evil-ast, \do-wrapped]
       if this[key]
         sb.push "\n  "
         sb.push key
@@ -2743,7 +2743,7 @@ class MacroAccess extends Node
       else
         sb.push v
     sb.push "}"
-    for key in [\in-statement, \in-generator, \in-evil-ast, \do-wrapped]
+    for key in [\in-statement, \in-generator, \in-promise, \in-evil-ast, \do-wrapped]
       if this[key]
         sb.push ", +"
         sb.push key
@@ -2781,7 +2781,7 @@ class MacroAccess extends Node
       if other == this
         true
       else if other instanceof MacroAccess
-        unless @in-statement == other.in-statement and @in-generator == other.in-generator and @in-evil-ast == other.in-evil-ast and @do-wrapped == other.do-wrapped
+        unless @in-statement == other.in-statement and @in-generator == other.in-generator and @in-promise == other.in-promise and @in-evil-ast == other.in-evil-ast and @do-wrapped == other.do-wrapped
           false
         else
           object-eql @data, other.data
@@ -2843,7 +2843,7 @@ class MacroAccess extends Node
     #(func, context)
       let data = walk-item(@data, func, context)
       if data != @data
-        MacroAccess @index, @scope, @id, data, @in-statement, @in-generator, @in-evil-ast, @do-wrapped
+        MacroAccess @index, @scope, @id, data, @in-statement, @in-generator, @in-promise, @in-evil-ast, @do-wrapped
       else
         this
   def walk-async = do
@@ -2889,7 +2889,7 @@ class MacroAccess extends Node
     #(func, context, callback)
       async! callback, data <- walk-item @data, func, context
       callback null, if data != @data
-        MacroAccess @index, @scope, @id, data, @in-statement, @in-generator, @in-evil-ast, @do-wrapped
+        MacroAccess @index, @scope, @id, data, @in-statement, @in-generator, @in-promise, @in-evil-ast, @do-wrapped
       else
         this
 
@@ -2900,7 +2900,7 @@ class MacroAccess extends Node
     if @do-wrapped
       this
     else
-      MacroAccess @index, @scope, @id, @data, @in-statement, @in-generator, @in-evil-ast, true
+      MacroAccess @index, @scope, @id, @data, @in-statement, @in-generator, @in-promise, @in-evil-ast, true
 
   def mutate-last(parser, func, context, include-noop)
     parser.macro-expand-1(this).mutate-last(parser, func, context, include-noop)

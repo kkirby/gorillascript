@@ -17,7 +17,7 @@ let ret-this() -> this
  * Represents the object that will be passed in as the `this` binding to macros.
  */
 class MacroContext
-  def constructor(@parser/* as Parser*/, @index, @position, @in-generator, @in-evil-ast)
+  def constructor(@parser/* as Parser*/, @index, @position, @in-generator, @in-promise, @in-evil-ast)
     @unsaved-tmps := []
     @saved-tmps := []
   
@@ -552,6 +552,7 @@ class MacroContext
           constify-object position, obj.data, obj.index, scope
           ParserNode.Value obj.index, obj.in-statement
           ParserNode.Value obj.index, obj.in-generator
+		  ParserNode.Value obj.index, obj.in-promise
           ParserNode.Value obj.index, obj.in-evil-ast
           ParserNode.Value obj.index, obj.do-wrapped
     else if obj.constructor == Object
@@ -628,11 +629,11 @@ class MacroContext
   def get-const(name as String)
     to-literal-node@ this, @get-const-value(name)
   
-  def macro(from-position, id, data, position, in-generator, in-evil-ast)
+  def macro(from-position, id, data, position, in-generator, in-promise, in-evil-ast)
     let index = if from-position and is-number! from-position.index
       from-position.index
     else
       @index
-    ParserNode.MacroAccess(index, @scope(), id, data, position, in-generator or @parser.in-generator.peek(), in-evil-ast).reduce(@parser)
+    ParserNode.MacroAccess(index, @scope(), id, data, position, in-generator or @parser.in-generator.peek(), in-promise or @parser.in-promise.peek(), in-evil-ast).reduce(@parser)
 
 module.exports := MacroContext

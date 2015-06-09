@@ -2748,6 +2748,7 @@ let _FunctionBody = one-of<ParserNode>(
 
 let FunctionBody = make-alter-stack<Boolean>(\in-generator, false)(_FunctionBody)
 let GeneratorFunctionBody = make-alter-stack<Boolean>(\in-generator, true)(_FunctionBody)
+let GeneratorPromiseFunctionBody = make-alter-stack<Boolean>(\in-promise, true)(GeneratorFunctionBody)
 
 let IdentifierOrSimpleAccessStart = one-of(
   Identifier
@@ -3163,9 +3164,11 @@ let _FunctionDeclaration = do
   
   let maybe-params-rule = maybe ParameterSequence, #-> []
   let as-type-rule = in-function-type-params MaybeAsType
-  let get-body-rule = #(generator)
-    if generator
-      GeneratorFunctionBody
+  let get-body-rule = #(generator,promise)
+    if generator and promise
+      GeneratorPromiseFunctionBody
+	else if generator
+	  GeneratorFunctionBody
     else
       FunctionBody
   allow-space-before-access #(parser, index)
@@ -3184,7 +3187,7 @@ let _FunctionDeclaration = do
     let flags = FunctionFlags parser, params.index
     let flags-value = flags.value
     let as-type = as-type-rule parser, flags.index
-    let body = get-body-rule(flags.value.generator)(parser, as-type.index)
+    let body = get-body-rule(flags.value.generator,flags.value.promise)(parser, as-type.index)
     if not body
       parser.pop-scope()
       return
@@ -5104,6 +5107,7 @@ class Parser
     @position := Stack<String>(\statement)
     @in-ast := Stack<Boolean>(false)
     @in-generator := Stack<Boolean>(false)
+	@in-promise := Stack<Boolean>(false)
     @in-function-type-params := Stack<Boolean>(false)
     @prevent-unclosed-object-literal := Stack<Boolean>(false)
     @allow-embedded-text := Stack<Boolean>(true)
@@ -5913,6 +5917,7 @@ class Parser
           remove-noops(data)
           parser.position.peek() == \statement
           parser.in-generator.peek()
+		  parser.in-promise.peek()
           parser.in-evil-ast.peek()
       else
         throw Error "Cannot use macro until fully defined"
@@ -5932,10 +5937,11 @@ class Parser
           remove-noops(data)
           parser.position.peek() == \statement
           parser.in-generator.peek()
+		  parser.in-promise.peek()
           parser.in-evil-ast.peek()
       else
         let scope = parser.push-scope(false)
-        let macro-context = MacroContext parser, index, parser.position.peek(), parser.in-generator.peek(), parser.in-evil-ast.peek()
+        let macro-context = MacroContext parser, index, parser.position.peek(), parser.in-generator.peek(), parser.in-promise.peek(), parser.in-evil-ast.peek()
         if type == \assign-operator
           let left = macro-context.macro-expand-1(data.left)
           if left.is-ident and not parser.in-evil-ast.peek()
@@ -6079,6 +6085,7 @@ class Parser
         nodes.push node
         @position.push if node.in-statement then \statement else \expression
         @in-generator.push node.in-generator
+		@in-promise.push node.in-promise
         @in-evil-ast.push node.in-evil-ast
         @scope.push node.scope
         let old-expanding-macros = @expanding-macros
@@ -6096,6 +6103,7 @@ class Parser
           @scope.pop()
           @position.pop()
           @in-generator.pop()
+		  @in-promise.pop()
           @in-evil-ast.pop()
           @expanding-macros := old-expanding-macros
         node := if node.do-wrapped
