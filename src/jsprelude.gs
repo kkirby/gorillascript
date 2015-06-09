@@ -1696,6 +1696,9 @@ macro for
 				body := ASTE(body) $func@(this, $value-expr)
 			_func.args[* - 1] := @const @inGenerator
 			if @inGenerator; body := ASTE yield $body
+			if @inPromise; _func := @parser.get-macro-by-label(\__promise).func {
+				macroData: [_func]
+			}, @parser, @index
 			init.push ASTE let $func = $_func
 			if hasBreak or hasContinue
 				let result = @tmp \result, false
@@ -1820,6 +1823,9 @@ macro for
 				body := (ASTE(body) $func@(this, $key))
 			_func.args[* - 1] := @const @inGenerator
 			if @inGenerator; body := ASTE yield $body
+			if @inPromise; _func := @parser.get-macro-by-label(\__promise).func {
+				macroData: [_func]
+			}, @parser, @index
 			init.push ASTE let $func = $_func
 			if hasBreak or hasContinue
 				let result = @tmp \result, false
