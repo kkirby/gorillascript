@@ -2561,7 +2561,7 @@ macro for
 			$main
 		finally
 			try
-				$iterator.close()
+				$iterator.close?()
 			catch $err
 				void
 
@@ -2894,7 +2894,7 @@ macro helper __async-iter = #(mutable limit as Number, iterator as {next: Functi
 	let mutable close = #
 		close := #->
 		try
-			iterator.close()
+			iterator.close?()
 		catch e
 			void
 	let next()!
