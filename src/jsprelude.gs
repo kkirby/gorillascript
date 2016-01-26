@@ -3749,7 +3749,7 @@ macro helper __generator-to-promise = #(func)
 				let info = try; iter[handler](result)
 				catch e; return reject e
 				if info.done; fulfill info.value
-				else if info.value instanceof Promise
+				else if info.value instanceof Promise or typeof info.value.then == \function
 					info.value.then(
 						#(result) -> next(result)
 						#(e) -> next e, \throw
