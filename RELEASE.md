@@ -1,5 +1,9 @@
 # GorillaScript Community Release v1.0.0
 
+## June 14th, 2016 (v1.0.1)
+
+Added an `async!` macro ala `promise!`
+
 ## June 14th, 2016 (v1.0.0)
 
 Made #** produce an async function and added await keyword. Usage:
