@@ -64,6 +64,7 @@ const AstType = {
   TryFinally:     29
   Unary:          30
   Yield:          39
+  Await:          40
 }
 
 let inc-indent(options)
@@ -1455,7 +1456,9 @@ let compile-func-body(options, sb, declarations, variables, body, mutable line-s
     if not minify
       sb options.linefeed or "\n"
 
-let compile-func(options, sb, name, params, declarations, variables, body, generator = false)
+let compile-func(options, sb, name, params, declarations, variables, body, generator = false, promise = false)
+  if promise
+    sb "async "
   sb "function"
   let minify = options.minify
   if not minify or name?
@@ -1483,7 +1486,7 @@ let compile-func(options, sb, name, params, declarations, variables, body, gener
   sb "}"
 
 exports.Func := class Func extends Expression
-  def constructor(@pos as {}, @name as null|Ident, @params as [Ident] = [], @variables as [String] = [], body as Node = Noop(pos), @declarations as [String] = [],@generator)
+  def constructor(@pos as {}, @name as null|Ident, @params as [Ident] = [], @variables as [String] = [], body as Node = Noop(pos), @declarations as [String] = [],@generator,@promise)
     validate-func-params-and-variables params, variables
     @body := body.remove-trailing-return-voids()
   
@@ -1494,7 +1497,7 @@ exports.Func := class Func extends Expression
     let wrap = line-start and not @name
     if wrap
       sb "("
-    compile-func options, sb, @name, @params, @declarations, @variables, @body, @generator
+    compile-func options, sb, @name, @params, @declarations, @variables, @body, @generator, @promise
     if wrap
       sb ")"
     if options.source-map? and @pos.file
@@ -1514,7 +1517,7 @@ exports.Func := class Func extends Expression
     let params = walk-array(@params, this, \param, walker)
     let body = walker(@body, this, \body) ? @body.walk(walker)
     if name != @name or params != @params or body != @body
-      Func @pos, name, params, @variables, body, @declarations, @generator
+      Func @pos, name, params, @variables, body, @declarations, @generator, @promise
     else
       this
   
@@ -1538,16 +1541,17 @@ exports.Func := class Func extends Expression
     ...for declaration in @declarations
       Const pos, declaration
     Const pos, @generator
+    Const pos, @promise
   ]
-  @_from-ast := #(pos, name, params, variables, body, ...declarations, generator)
-    Func pos, name or null, params or [], variables or [], body, declarations, generator
+  @_from-ast := #(pos, name, params, variables, body, ...declarations, generator, promise)
+    Func pos, name or null, params or [], variables or [], body, declarations, generator, promise
   def _to-JSON()
-    let result = [@name or 0, simplify-array(@params, 0), simplify-array(@variables, 0), simplify-array(@declarations, 0), @generator]
+    let result = [@name or 0, simplify-array(@params, 0), simplify-array(@variables, 0), simplify-array(@declarations, 0), @generator, @promise]
     if simplify(@body)
       result.push ...@body.to-JSON()
     result
-  @from-JSON := #(line, column, file, name, params, variables, declarations, ...body, generator)
-    Func make-pos(line, column, file), (if name then from-JSON(name)), array-from-JSON(params), variables, from-JSON(body), declarations, generator
+  @from-JSON := #(line, column, file, name, params, variables, declarations, ...body, generator, promise)
+    Func make-pos(line, column, file), (if name then from-JSON(name)), array-from-JSON(params), variables, from-JSON(body), declarations, generator, promise
 
 exports.Ident := class Ident extends Expression
   def constructor(@pos as {}, @name as String, allow-unacceptable as Boolean)
@@ -2299,6 +2303,34 @@ exports.Yield := class Yield extends Expression
   def _to-JSON() -> @node.to-JSON().concat(@passThru)
   @from-JSON := #(line, column, file, source, ...node,passThru) -> Yield make-pos(line, column, file), from-JSON(node), passThru
 
+exports.Await := class Await extends Expression
+  def constructor(@pos as {}, @node as Expression,@passThru) ->
+
+  def compile(options, level, line-start, sb)!
+    if level > 2; sb "("
+    sb "await"
+    if @passThru
+      sb "*"
+    sb " "
+    @node.compile options, Level.inside-parentheses, false, sb
+    if level > 2; sb ")"
+
+  def compile-as-block(options, level, line-start, sb)!
+    Noop(@pos).compile-as-block(options, level, line-start, sb)
+  
+  def walk(walker)
+      let node = walker(@node, this, \node) ? @node.walk(walker)
+      if node != @node
+        Await @pos, node, @passThru
+      else
+        this
+
+  def type-id = AstType.Await
+  def _to-ast(pos, ident) -> [@node.to-ast(pos, ident),Const(pos,@passThru)]
+  @_from-ast := #(pos, node, passThru) -> Await pos, node, passThru
+  def _to-JSON() -> @node.to-JSON().concat(@passThru)
+  @from-JSON := #(line, column, file, source, ...node,passThru) -> Await make-pos(line, column, file), from-JSON(node), passThru
+
 
 exports.Switch := class Switch extends Statement
   def constructor(@pos as {}, mutable node = Noop(pos), @cases as [SwitchCase] = [], default-case as Node = Noop(pos), @label as Ident|null)
@@ -2800,6 +2832,7 @@ let AstType-to-class = {
   [AstType.TryFinally]: TryFinally
   [AstType.Unary]: Unary
   [AstType.Yield]: Yield
+  [AstType.Await]: Await
 }
 
 exports.by-type-id := #(type-id as Number, line as Number, column as Number, file, ...args)

@@ -1199,6 +1199,18 @@ macro yield*
 			@error "Can only use yield in a generator function"
 		@mutate-last node, (#(subnode) -> @internal-call \yield, subnode, @const(true)), true
 
+macro await
+	syntax node as Expression?
+		if not @in-promise
+			@error "Can only use await in an asynchronous function"
+		@mutate-last node, (#(subnode) -> @internal-call \await, subnode, @const(false)), true
+
+macro await*
+	syntax node as Expression?
+		if not @in-promise
+			@error "Can only use await* in an asynchronous function"
+		@mutate-last node, (#(subnode) -> @internal-call \await, subnode, @const(true)), true
+
 macro for
 	syntax reducer as (\every | \some | \first)?, init as (ExpressionOrAssignment|""), ";", test as (Logic|""), ";", step as (ExpressionOrAssignment|""), body as (BodyNoEnd | (";", this as Statement)), else-body as ("\n", "else", this as (BodyNoEnd | (";", this as Statement)))?, "end"
 		init ?= @noop()
@@ -1694,11 +1706,10 @@ macro for
 			else
 				_func := ASTE #($value-ident) -> $body
 				body := ASTE(body) $func@(this, $value-expr)
-			_func.args[* - 1] := @const @inGenerator
-			if @inGenerator; body := ASTE yield $body
-			if @inPromise; _func := @parser.get-macro-by-label(\__promise).func {
-				macroData: [_func]
-			}, @parser, @index
+			_func.args[* - 2] := @const false
+			_func.args[* - 1] := @const @in-promise
+			if @in-promise
+				body := ASTE await $body
 			init.push ASTE let $func = $_func
 			if hasBreak or hasContinue
 				let result = @tmp \result, false
@@ -1821,11 +1832,9 @@ macro for
 			else
 				_func := ASTE #($key) -> $body
 				body := (ASTE(body) $func@(this, $key))
-			_func.args[* - 1] := @const @inGenerator
-			if @inGenerator; body := ASTE yield $body
-			if @inPromise; _func := @parser.get-macro-by-label(\__promise).func {
-				macroData: [_func]
-			}, @parser, @index
+			_func.args[* - 2] := @const false
+			_func.args[* - 1] := @const @in-promise
+			if @in-promise; body := ASTE await $body
 			init.push ASTE let $func = $_func
 			if hasBreak or hasContinue
 				let result = @tmp \result, false

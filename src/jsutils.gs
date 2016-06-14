@@ -56,6 +56,7 @@ let is-acceptable-ident = do
     "while"
     "with"
     "yield"
+    "await"
   ]
   #(name as String, allow-unicode as Boolean)
     let regex = if allow-unicode then IDENTIFIER_UNICODE_REGEX else IDENTIFIER_REGEX

@@ -343,6 +343,7 @@ let translate-lispy-internal = [] <<<
           ParserNode.Value args[0].index, true
           ParserNode.Symbol.nothing args[0].index
           ParserNode.Value args[0].index, false
+          ParserNode.Value args[0].index, false
     else
       args[0]
     let t-text = translate wrapped, scope, \expression, unassigned
@@ -561,7 +562,7 @@ let translate-lispy-internal = [] <<<
           body := ast.Block body-pos,
             * ast.Assign body-pos, fake-this, ast.This(body-pos)
             * body
-      wrap ast.Func get-pos(node), null, param-idents, inner-scope.get-variables(), body, [], node.args[4].constValue()
+      wrap ast.Func get-pos(node), null, param-idents, inner-scope.get-variables(), body, [], node.args[4].constValue(), node.args[5].constValue()
   
   [ParserNodeInternalId.If]: #(node, args, scope, location, unassigned)
     let inner-location = if location in [\statement, \top-statement]
@@ -768,6 +769,10 @@ let translate-lispy-internal = [] <<<
   [ParserNodeInternalId.Yield]: #(node, args, scope, location, unassigned)
     let t-node = translate args[0], scope, \expression, unassigned
     # ast.Yield get-pos(node), t-node(), args[1]?.value
+  
+  [ParserNodeInternalId.Await]: #(node, args, scope, location, unassigned)
+    let t-node = translate args[0], scope, \expression, unassigned
+    # ast.Await get-pos(node), t-node(), args[1]?.value
 
   [ParserNodeInternalId.TmpWrapper]: #(node, args, scope, location, unassigned)
     let t-result = translate args[0], scope, location, unassigned
@@ -828,7 +833,7 @@ let translate-lispy-operator = [] <<<
       let right = t-right()
       if op-name == "=" and location == \top-statement and left instanceof ast.Ident and right instanceof ast.Func and not right.name? and scope.has-own-variable(left) and not scope.is-variable-mutable(left)
         scope.mark-as-function left
-        ast.Func(get-pos(node), left, right.params, right.variables, right.body, right.declarations, right.generator)
+        ast.Func(get-pos(node), left, right.params, right.variables, right.body, right.declarations, right.generator, right.promise)
       else
         ast.Binary(get-pos(node), left, op-name, right)
 

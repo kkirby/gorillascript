@@ -77,4 +77,6 @@ const ParserNodeInternalId = {
   TypeUnion:       37
   Var:             38
   Yield:           39
+  Await:           40
+  Async:           41
 } 
