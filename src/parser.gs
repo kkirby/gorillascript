@@ -2043,6 +2043,7 @@ let get-reserved-idents = do
     \while
     \with
     \yield
+	\await
   ]
   let RESERVED_IDENTS_NOINDENT = [...RESERVED_IDENTS, \end].sort()
   #(options)
@@ -2747,8 +2748,6 @@ let _FunctionBody = one-of<ParserNode>(
   Statement)
 
 let FunctionBody = make-alter-stack<Boolean>(\in-generator, false)(_FunctionBody)
-let GeneratorFunctionBody = make-alter-stack<Boolean>(\in-generator, true)(_FunctionBody)
-let GeneratorPromiseFunctionBody = make-alter-stack<Boolean>(\in-promise, true)(GeneratorFunctionBody)
 
 let IdentifierOrSimpleAccessStart = one-of(
   Identifier
@@ -3149,6 +3148,7 @@ let _FunctionDeclaration = do
           flags.bound := true
         case C("*")
           if flags.generator
+            flags.generator := false
             flags.promise := true
           else
             flags.generator := true
@@ -3165,12 +3165,10 @@ let _FunctionDeclaration = do
   let maybe-params-rule = maybe ParameterSequence, #-> []
   let as-type-rule = in-function-type-params MaybeAsType
   let get-body-rule = #(generator,promise)
-    if generator and promise
-      GeneratorPromiseFunctionBody
-	else if generator
-	  GeneratorFunctionBody
-    else
-      FunctionBody
+    let mutable result = _FunctionBody
+    result := make-alter-stack<Boolean>(\in-generator, generator)(result)
+    result := make-alter-stack<Boolean>(\in-promise, promise)(result)
+    result
   allow-space-before-access #(parser, index)
     let generic = GenericDefinitionPart parser, index
     let scope = parser.push-scope(true)
@@ -3202,14 +3200,8 @@ let _FunctionDeclaration = do
       LValue index, flags-value.bound
       as-type.value or LSymbol.nothing index
       LValue index, flags-value.generator
+      LValue index, flags-value.promise
     let mutable result = mutate-function func, parser, index
-    if flags-value.promise
-      let promise-macro = parser.get-macro-by-label \__promise
-      if not promise-macro
-        throw ParserError "Cannot use promises until the promise! macro has been defined", parser, index
-      result := promise-macro.func {
-        macro-data: [result]
-      }, parser, index
     if flags-value.curry and params.value.length > 1
       // TODO: verify that there are no spread parameters
       result := LCall index, parser.scope.peek(),
@@ -3484,6 +3476,7 @@ let CustomOperatorCloseParenthesis = do
         }, parser, index
       LValue index, false
       LSymbol.nothing index
+      LValue index, false
       LValue index, false), parser, index
     parser.pop-scope()
     Box close.index, result
@@ -3525,6 +3518,7 @@ let CustomOperatorCloseParenthesis = do
         }, parser, index
       LValue index, false
       LSymbol.nothing index
+      LValue index, false
       LValue index, false), parser, index
     parser.pop-scope()
     Box close.index, LCall index, parser.scope.peek(),
@@ -3590,6 +3584,7 @@ define Parenthetical = allow-space-before-access sequential(
             }, parser, index
           LValue index, false
           LSymbol.nothing index
+          LValue index, false
           LValue index, false), parser, index
         parser.pop-scope()
         result
@@ -3618,6 +3613,7 @@ define Parenthetical = allow-space-before-access sequential(
             }, parser, index
           LValue index, false
           LSymbol.nothing index
+          LValue index, false
           LValue index, false), parser, index
         parser.pop-scope()
         result
@@ -3643,6 +3639,7 @@ define Parenthetical = allow-space-before-access sequential(
             }, tail, parser, index).rescope scope
           LValue index, false
           LSymbol.nothing index
+          LValue index, false
           LValue index, false), parser, index
         parser.pop-scope()
         result)])
@@ -5025,6 +5022,7 @@ let EmbeddedRoot = #(parser as Parser)
     root.value
     LValue shebang.index, true
     LValue shebang.index, parser.in-generator.peek()
+    LValue shebang.index, parser.in-promise.peek()
 
 let EmbeddedRootGenerator = #(parser as Parser)
   parser.in-generator.push true
@@ -5107,7 +5105,7 @@ class Parser
     @position := Stack<String>(\statement)
     @in-ast := Stack<Boolean>(false)
     @in-generator := Stack<Boolean>(false)
-	@in-promise := Stack<Boolean>(false)
+    @in-promise := Stack<Boolean>(false)
     @in-function-type-params := Stack<Boolean>(false)
     @prevent-unclosed-object-literal := Stack<Boolean>(false)
     @allow-embedded-text := Stack<Boolean>(true)
@@ -5322,6 +5320,7 @@ class Parser
           LInternalCall \auto-return, body.index, body.scope, body
           LValue index, false
           LSymbol.nothing index
+          LValue index, false
           LValue index, false
       LValue index, false
       LValue index, false

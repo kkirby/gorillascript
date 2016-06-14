@@ -186,7 +186,7 @@ class MacroContext
    * Return a Function node, properly rescoping the body and adding the params
    * to the scope.
    */
-  def func(mutable params, body as ParserNode, bound as (ParserNode|Boolean) = false, as-type, is-generator as Value|Boolean)
+  def func(mutable params, body as ParserNode, bound as (ParserNode|Boolean) = false, as-type, is-generator as Value|Boolean, is-promise as Value|Boolean)
     if params instanceof ParserNode
       if params.is-internal-call(\array)
         params := params.args
@@ -216,7 +216,11 @@ class MacroContext
       if is-generator instanceof Value
         is-generator
       else
-        ParserNode.Value body.index, not not is-generator).reduce(@parser)
+        ParserNode.Value body.index, not not is-generator
+      if is-promise instanceof Value
+        is-promise
+      else
+        ParserNode.Value body.index, not not is-promise).reduce(@parser)
     @parser.pop-scope()
     func
 

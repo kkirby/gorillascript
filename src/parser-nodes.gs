@@ -822,7 +822,7 @@ class Symbol extends Node
       function: {
         internal-id: ParserNodeInternalId.Function
         -do-wrap-args
-        validate-args(params as Node, body as Node, bound as Node, as-type as Node, is-generator as Value)
+        validate-args(params as Node, body as Node, bound as Node, as-type as Node, is-generator as Value, is-promise as Value)
           if not params.is-internal-call(\array)
             throw Error "Expected params to be an internal Array call, got $(typeof! params)"
         _type: do
@@ -1328,6 +1328,12 @@ class Symbol extends Node
         validate-args(node as Node, ...rest)
           if DEBUG and rest.length > 0
             throw Error "Too many arguments to yield"
+      }
+      await: {
+        internal-id: ParserNodeInternalId.Await
+        validate-args(node as Node, ...rest)
+          if DEBUG and rest.length > 0
+            throw Error "Too many arguments to await"
       }
     for name, data of internal-symbols
       let is-name-key = "is$(capitalize name)"
@@ -2643,6 +2649,7 @@ class Call extends Node
             @rescope(inner-scope)
           Value @index, true
           Symbol.nothing @index
+          Value @index, false
           Value @index, false
       parser.pop-scope()
       result
