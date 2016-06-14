@@ -2730,6 +2730,8 @@ define MaybeQuestionMarkChar = maybe character! "?"
 
 let GeneratorBody = make-alter-stack<Boolean>(\in-generator, true)(Body)
 let GeneratorBodyNoEnd = make-alter-stack<Boolean>(\in-generator, true)(BodyNoEnd)
+let AsyncBody = make-alter-stack<Boolean>(\in-promise, true)(Body)
+let AsyncBodyNoEnd = make-alter-stack<Boolean>(\in-promise, true)(BodyNoEnd)
 
 let LessThanChar = character! "<"
 let LessThan = with-space LessThanChar
@@ -5085,6 +5087,8 @@ let make-macro-holder()
     BodyNoEnd
     GeneratorBody
     GeneratorBodyNoEnd
+    AsyncBody
+    AsyncBodyNoEnd
     End
     Identifier
     SimpleAssignable: IdentifierOrSimpleAccess
