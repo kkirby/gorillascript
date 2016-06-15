@@ -833,6 +833,8 @@ class Symbol extends Node
                 node-to-type(call.args[3]).function()
               else if call.args[4].const-value()
                 Type.generator
+			  else if call.args[5].const-value()
+				Type.promise
               else
                 call.args[1].return-type(parser, true).function()
         _is-noop() true
