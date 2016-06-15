@@ -1082,7 +1082,7 @@ class Symbol extends Node
       root: {
         internal-id: ParserNodeInternalId.Root
         -do-wrap-args
-        validate-args(file as Value, body as Node, is-embedded as Value, is-generator as Value, ...rest)
+        validate-args(file as Value, body as Node, is-embedded as Value, is-generator as Value, is-promise as Value,...rest)
           if DEBUG and rest.length > 0
             throw Error "Too many arguments to return"
         +used-as-statement
