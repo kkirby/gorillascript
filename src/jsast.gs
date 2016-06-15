@@ -911,7 +911,15 @@ exports.Call := class Call extends Expression
       sb "("
     if @is-new
       sb "new "
-    @func.compile options, if @is-new then Level.new-call else Level.call-or-access, line-start and not wrap and not @is-new, sb
+    @func.compile(
+      options
+      if @is-new
+        Level.new-call
+      else
+        Level.call-or-access
+      (line-start and not wrap and not @is-new) or (@func instanceof Func and @func.promise)
+      sb
+    )
     let f = if not options.minify and @should-compile-large() then compile-large else compile-small
     f(@args, options, level, line-start, sb)
     if wrap
