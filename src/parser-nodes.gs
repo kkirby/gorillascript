@@ -833,6 +833,8 @@ class Symbol extends Node
                 node-to-type(call.args[3]).function()
               else if call.args[4].const-value()
                 Type.generator
+			  else if call.args[5].const-value()
+				Type.promise
               else
                 call.args[1].return-type(parser, true).function()
         _is-noop() true
@@ -1080,7 +1082,7 @@ class Symbol extends Node
       root: {
         internal-id: ParserNodeInternalId.Root
         -do-wrap-args
-        validate-args(file as Value, body as Node, is-embedded as Value, is-generator as Value, ...rest)
+        validate-args(file as Value, body as Node, is-embedded as Value, is-generator as Value, is-promise as Value,...rest)
           if DEBUG and rest.length > 0
             throw Error "Too many arguments to return"
         +used-as-statement

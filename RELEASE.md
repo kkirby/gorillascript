@@ -1,5 +1,9 @@
 # GorillaScript Community Release v1.0.0
 
+## June 15th, 2016 (v1.0.2)
+
+Fixed bugs with async functions
+
 ## June 14th, 2016 (v1.0.1)
 
 Added an `async!` macro ala `promise!`

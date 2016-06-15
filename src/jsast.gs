@@ -456,7 +456,7 @@ exports.Binary := class Binary extends Expression
       (if left instanceof Const then left else Const(left.pos, void)).compile options, Level.inside-parentheses, false, sb
       sb ")"
     else
-      left.compile options, Level.call-or-access, line-start, sb
+      left.compile options, Level.call-or-access, line-start or (left instanceof Func and left.promise), sb
     
     if dot-access
       sb "."
@@ -911,7 +911,15 @@ exports.Call := class Call extends Expression
       sb "("
     if @is-new
       sb "new "
-    @func.compile options, if @is-new then Level.new-call else Level.call-or-access, line-start and not wrap and not @is-new, sb
+    @func.compile(
+      options
+      if @is-new
+        Level.new-call
+      else
+        Level.call-or-access
+      (line-start and not wrap and not @is-new) or (@func instanceof Func and @func.promise)
+      sb
+    )
     let f = if not options.minify and @should-compile-large() then compile-large else compile-small
     f(@args, options, level, line-start, sb)
     if wrap

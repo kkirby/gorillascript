@@ -2749,7 +2749,7 @@ let _FunctionBody = one-of<ParserNode>(
   Body
   Statement)
 
-let FunctionBody = make-alter-stack<Boolean>(\in-generator, false)(_FunctionBody)
+let FunctionBody = _FunctionBody |> make-alter-stack<Boolean>(\in-promise, false) |> make-alter-stack<Boolean>(\in-generator, false)
 
 let IdentifierOrSimpleAccessStart = one-of(
   Identifier

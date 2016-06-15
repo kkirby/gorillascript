@@ -2303,7 +2303,8 @@ macro operator unary mutate-function! with type: \node, label: \mutate-function
 				$body
 			node.args[2]
 			node.args[3]
-			node.args[4])
+			node.args[4]
+			node.args[5])
 	else
 		node
 	
@@ -2750,7 +2751,8 @@ macro once!(func, silent-fail)
 				$body
 			func.args[2]
 			func.args[3]
-			func.args[4])
+			func.args[4]
+			func.args[5])
 		AST
 			let mutable $ran = false
 			$func
@@ -3785,7 +3787,7 @@ macro promise!
 
 macro async!
 	syntax body as AsyncBody
-		ASTE (#** -> $body)()
+		ASTE (#@** -> $body)()
 
 macro __promise!(node) with label: \__promise
 	ASTE promise! $node
