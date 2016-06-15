@@ -3787,7 +3787,7 @@ macro promise!
 
 macro async!
 	syntax body as AsyncBody
-		ASTE (#** -> $body)()
+		ASTE (#@** -> $body)()
 
 macro __promise!(node) with label: \__promise
 	ASTE promise! $node
