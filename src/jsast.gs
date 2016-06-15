@@ -456,7 +456,7 @@ exports.Binary := class Binary extends Expression
       (if left instanceof Const then left else Const(left.pos, void)).compile options, Level.inside-parentheses, false, sb
       sb ")"
     else
-      left.compile options, Level.call-or-access, line-start, sb
+      left.compile options, Level.call-or-access, line-start or (left instanceof Func and left.promise), sb
     
     if dot-access
       sb "."
