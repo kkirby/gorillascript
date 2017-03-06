@@ -1,5 +1,9 @@
 # GorillaScript Community Release v1.0.0
 
+## March 6th, 2017 (v1.0.3)
+
+Fixed `__slice` not being defined when using array splats.
+
 ## June 15th, 2016 (v1.0.2)
 
 Fixed bugs with async functions
