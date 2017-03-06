@@ -238,6 +238,9 @@ let array-translate(pos as {}, elements, scope, replace-with-slice, allow-array-
               [node]
 
     if translated-items.length == 1
+      scope
+	    ..add-helper \__to-array
+	    ..add-helper \__slice
       #
         let array = translated-items[0]()
         if replace-with-slice
